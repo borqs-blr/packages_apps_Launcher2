@@ -160,7 +160,7 @@ public abstract class PagedView extends ViewGroup implements ViewGroup.OnHierarc
 
     // It true, use a different slop parameter (pagingTouchSlop = 2 * touchSlop) for deciding
     // to switch to a new page
-    protected boolean mUsePagingTouchSlop = true;
+    protected boolean mUsePagingTouchSlop = false;
 
     // If true, the subclass should directly update scrollX itself in its computeScroll method
     // (SmoothPagedView does this)
@@ -1113,15 +1113,40 @@ public abstract class PagedView extends ViewGroup implements ViewGroup.OnHierarc
             if (mUsePagingTouchSlop ? xPaged : xMoved) {
                 // Scroll if the user moved far enough along the X axis
                 mTouchState = TOUCH_STATE_SCROLLING;
-                mTotalMotionX += Math.abs(mLastMotionX - x);
-                mLastMotionX = x;
                 mLastMotionXRemainder = 0;
                 mTouchX = getScrollX();
-                mSmoothingTime = System.nanoTime() / NANOTIME_DIV;
                 pageBeginMoving();
+                // Early scroll by starting as soon as we detect it's okay to scroll
+                // instead of waiting for vsync.
+                initiateScroll(ev);
             }
             // Either way, cancel any pending longpress
             cancelCurrentPageLongPress();
+        }
+    }
+
+    protected void initiateScroll(MotionEvent ev) {
+        final int pointerIndex = ev.findPointerIndex(mActivePointerId);
+        final float x = ev.getX(pointerIndex);
+        final float deltaX = mLastMotionX + mLastMotionXRemainder - x;
+        mTotalMotionX += Math.abs(deltaX);
+
+        // Only scroll and update mLastMotionX if we have moved some discrete amount.  We
+        // keep the remainder because we are actually testing if we've moved from the last
+        // scrolled position (which is discrete).
+        if (Math.abs(deltaX) >= 1.0f) {
+            mTouchX += deltaX;
+            mSmoothingTime = System.nanoTime() / NANOTIME_DIV;
+            if (!mDeferScrollUpdate) {
+                scrollBy((int) deltaX, 0);
+                if (DEBUG) Log.d(TAG, "onTouchEvent().Scrolling: " + deltaX);
+            } else {
+                invalidate();
+            }
+            mLastMotionX = x;
+            mLastMotionXRemainder = deltaX - (int) deltaX;
+        } else {
+            awakenScrollBars();
         }
     }
 
@@ -1251,29 +1276,7 @@ public abstract class PagedView extends ViewGroup implements ViewGroup.OnHierarc
         case MotionEvent.ACTION_MOVE:
             if (mTouchState == TOUCH_STATE_SCROLLING) {
                 // Scroll to follow the motion event
-                final int pointerIndex = ev.findPointerIndex(mActivePointerId);
-                final float x = ev.getX(pointerIndex);
-                final float deltaX = mLastMotionX + mLastMotionXRemainder - x;
-
-                mTotalMotionX += Math.abs(deltaX);
-
-                // Only scroll and update mLastMotionX if we have moved some discrete amount.  We
-                // keep the remainder because we are actually testing if we've moved from the last
-                // scrolled position (which is discrete).
-                if (Math.abs(deltaX) >= 1.0f) {
-                    mTouchX += deltaX;
-                    mSmoothingTime = System.nanoTime() / NANOTIME_DIV;
-                    if (!mDeferScrollUpdate) {
-                        scrollBy((int) deltaX, 0);
-                        if (DEBUG) Log.d(TAG, "onTouchEvent().Scrolling: " + deltaX);
-                    } else {
-                        invalidate();
-                    }
-                    mLastMotionX = x;
-                    mLastMotionXRemainder = deltaX - (int) deltaX;
-                } else {
-                    awakenScrollBars();
-                }
+                initiateScroll(ev);
             } else {
                 determineScrollingStart(ev);
             }
