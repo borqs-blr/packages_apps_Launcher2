@@ -483,6 +483,32 @@ public class LauncherModel extends BroadcastReceiver {
         updateItemInDatabaseHelper(context, values, item, "updateItemInDatabase");
     }
 
+    public void updateItemTitleInDatabase(Context context, final String original_title, final String title, Intent intent) {
+        final ContentResolver cr = context.getContentResolver();
+        long itemId = 0;
+        Cursor c = null;
+        try {
+            c = cr.query(LauncherSettings.Favorites.CONTENT_URI,
+                    null, "title=? and intent=?",
+                    new String[] { original_title, intent.toUri(0) }, null);
+            if (c.moveToFirst()) {
+                do {
+                    final int idIndex = c.getColumnIndexOrThrow(LauncherSettings.Favorites._ID);
+                    itemId = c.getLong(idIndex);
+                    ItemInfo modelItem = sBgItemsIdMap.get(itemId);
+                    final ContentValues values = new ContentValues();
+                    values.put(LauncherSettings.Favorites.TITLE, title);
+                    updateItemInDatabaseHelper(context, values, modelItem, "updateItemNameInDatabase");
+                } while(c.moveToNext());
+                forceReload();
+            }
+        } finally {
+            if (c != null) {
+                c.close();
+            }
+        }
+    }
+
     /**
      * Returns true if the shortcuts already exists in the database.
      * we identify a shortcut by its title and intent.
