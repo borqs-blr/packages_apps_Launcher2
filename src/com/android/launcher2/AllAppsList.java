@@ -45,6 +45,12 @@ class AllAppsList {
     public ArrayList<ApplicationInfo> modified = new ArrayList<ApplicationInfo>();
 
     private IconCache mIconCache;
+    private boolean mMail189Installed = false; //Mail189 client
+    private boolean mQCMail189Installed = true; //Qualcomm Mail189 app
+    private ApplicationInfo mQCMail189Info;
+    public static final String QC_MAIL_PACKAGE_NAME = "com.qualcomm.mail189";
+    public static final String QC_MAIL_CLASS_NAME = "com.qualcomm.mail189.Mail189Activity";
+    public static final String MAIL189_PACKAGE_NAME = "com.corp21cn.mail189";
 
     /**
      * Boring constructor.
@@ -62,6 +68,21 @@ class AllAppsList {
     public void add(ApplicationInfo info) {
         if (findActivity(data, info.componentName)) {
             return;
+        }
+        if(Launcher.Mail189_ENABLED) {
+            if (MAIL189_PACKAGE_NAME.equals(info.componentName.getPackageName())) {
+                mMail189Installed = true;
+                if (mQCMail189Installed && mQCMail189Info != null) {
+                    removed.add(mQCMail189Info);
+                    data.remove(mQCMail189Info);
+                }
+            } else if (QC_MAIL_PACKAGE_NAME.equals(info.componentName.getPackageName())) {
+                mQCMail189Installed = true;
+                mQCMail189Info = info;
+                if (mMail189Installed) {
+                    return;
+                }
+            }
         }
         data.add(info);
         added.add(info);
@@ -99,18 +120,32 @@ class AllAppsList {
     /**
      * Remove the apps for the given apk identified by packageName.
      */
-    public void removePackage(String packageName) {
+    public void removePackage(String packageName, boolean isRemove) {
         final List<ApplicationInfo> data = this.data;
         for (int i = data.size() - 1; i >= 0; i--) {
             ApplicationInfo info = data.get(i);
             final ComponentName component = info.intent.getComponent();
             if (packageName.equals(component.getPackageName())) {
+                if(Launcher.Mail189_ENABLED) {
+                    if (QC_MAIL_PACKAGE_NAME.equals(packageName)) {
+                        mQCMail189Installed = false;
+                        mQCMail189Info = null;
+                    } else if (MAIL189_PACKAGE_NAME.equals(packageName)) {
+                        mMail189Installed = false;
+                        if (mQCMail189Installed && mQCMail189Info != null) {
+                            add(mQCMail189Info);
+                        }
+                    }
+                }
                 removed.add(info);
                 data.remove(i);
+                if(isRemove){
+                    mIconCache.remove(component);
+                }
             }
         }
         // This is more aggressive than it needs to be.
-        mIconCache.flush();
+        //mIconCache.flush();
     }
 
     /**

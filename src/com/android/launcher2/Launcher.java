@@ -351,6 +351,8 @@ public final class Launcher extends Activity
 
     private static boolean sForceEnableRotation = isPropertyEnabled(FORCE_ENABLE_ROTATION_PROPERTY);
 
+    public static boolean Mail189_ENABLED;
+
     private static class PendingAddArguments {
         int requestCode;
         Intent intent;
@@ -398,6 +400,8 @@ public final class Launcher extends Activity
         mAppWidgetHost.startListening();
 
         LUNCHER_SORT_ENABLED = getResources().getBoolean(R.bool.config_launcher_sort);
+
+        Mail189_ENABLED = getResources().getBoolean(R.bool.config_launcher_mail189);
 
         // If we are getting an onCreate, we can actually preempt onResume and unset mPaused here,
         // this also ensures that any synchronous binding below doesn't re-trigger another
@@ -2244,7 +2248,17 @@ public final class Launcher extends Activity
     boolean startActivitySafely(View v, Intent intent, Object tag) {
         boolean success = false;
         try {
-            success = startActivity(v, intent, tag);
+            if(Mail189_ENABLED && intent.getComponent() != null
+                && intent.getComponent().getPackageName().equals(AllAppsList.MAIL189_PACKAGE_NAME)){
+                Intent i = new Intent(Intent.ACTION_MAIN);
+                i.addCategory(Intent.CATEGORY_LAUNCHER);
+                ComponentName cn = new ComponentName(AllAppsList.QC_MAIL_PACKAGE_NAME,
+                    AllAppsList.QC_MAIL_CLASS_NAME);
+                i.setComponent(cn);
+                success = startActivity(v, i, tag);
+            } else {
+                success = startActivity(v, intent, tag);
+            }
         } catch (ActivityNotFoundException e) {
             Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT).show();
             Log.e(TAG, "Unable to launch. tag=" + tag + " intent=" + intent, e);

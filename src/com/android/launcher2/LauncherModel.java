@@ -2033,7 +2033,7 @@ public class LauncherModel extends BroadcastReceiver {
                 case OP_UNAVAILABLE:
                     for (int i=0; i<N; i++) {
                         if (DEBUG_LOADERS) Log.d(TAG, "mAllAppsList.removePackage " + packages[i]);
-                        mBgAllAppsList.removePackage(packages[i]);
+                        mBgAllAppsList.removePackage(packages[i], mOp == OP_REMOVE);
                         LauncherApplication app =
                                 (LauncherApplication) context.getApplicationContext();
                         WidgetPreviewLoader.removeFromDb(
