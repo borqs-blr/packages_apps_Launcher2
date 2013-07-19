@@ -89,4 +89,5 @@
     <integer name="hotseat_item_scale_percentage">100</integer>
 
     <bool name="config_launcher_sort">false</bool>
+    <bool name="config_launcher_page">false</bool>
 </resources>

@@ -155,7 +155,7 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         PagedViewIcon.PressedCallback, PagedViewWidget.ShortPressListener,
         LauncherTransitionable {
     static final String TAG = "AppsCustomizePagedView";
-    private static final boolean SHOW_CTAPP_FEATRUE = false;
+    private static boolean mShowCTApp;
 
     /**
      * The different content types that this paged view can show.
@@ -304,6 +304,8 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         mCanvas = new Canvas();
         mRunningTasks = new ArrayList<AppsCustomizeAsyncTask>();
 
+        mShowCTApp = context.getResources().getBoolean(R.bool.config_launcher_page);
+
         // Save the default widget preview background
         TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.AppsCustomizePagedView, 0, 0);
         mMaxAppCellCountX = a.getInt(R.styleable.AppsCustomizePagedView_maxAppCellCountX, -1);
@@ -328,7 +330,7 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
             setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         }
         configClassArray(context, mPreClassArray, PRE_CLASS_IDENTIFIER, true);
-        if (SHOW_CTAPP_FEATRUE) {
+        if (mShowCTApp) {
             configClassArray(context, mCTClassArray, CT_CLASS_IDENTIFIER, false);
             configClassArray(context, mCTFirstPageArray, CT_FIRSTPAGE_IDENTIFIER, false);
         }
@@ -404,6 +406,9 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         mNumWidgetPages = (int) Math.ceil(mWidgets.size() /
                 (float) (mWidgetCountX * mWidgetCountY));
         mNumAppsPages = (int) Math.ceil((float) mApps.size() / (mCellCountX * mCellCountY));
+        if(mShowCTApp){
+            mNumAppsPages = mNumAppsPages + 2; //for ct
+        }
     }
 
     protected void onDataReady(int width, int height) {
@@ -1106,13 +1111,15 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         // ensure that we have the right number of items on the pages
         final boolean isRtl = isLayoutRtl();
         int numCells = mCellCountX * mCellCountY;
-        boolean isflag = SHOW_CTAPP_FEATRUE && (page <= 1); //set page 1 & 2 to CT's app
-        int startIndex = isflag ? 0 : (SHOW_CTAPP_FEATRUE && page>1 ?
-            (page-2)* numCells : page * numCells);
-        int ctEndIndex = page==0 ? Math.min(startIndex + numCells, ctFirstPageApps.size())
-            : Math.min(startIndex + numCells, ctApps.size());
+        boolean isCTFlag = mShowCTApp && (page < CT_CUSTOMIZED_PAGE_COUNT);
+        int startIndex = isCTFlag ? 0
+                : ((mShowCTApp && page >= CT_CUSTOMIZED_PAGE_COUNT)
+                        ? (page - CT_CUSTOMIZED_PAGE_COUNT) * numCells
+                        : page * numCells);
+        int ctEndIndex = (page == 0) ? Math.min(startIndex + numCells, ctFirstPageApps.size())
+                : Math.min(startIndex + numCells, ctApps.size());
         int defEndIndex = Math.min(startIndex + numCells, mApps.size());
-        int endIndex = isflag ? ctEndIndex : defEndIndex ;
+        int endIndex = isCTFlag ? ctEndIndex : defEndIndex ;
 
         PagedViewCellLayout layout;
         try {
@@ -1126,8 +1133,9 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         ArrayList<Object> items = new ArrayList<Object>();
         ArrayList<Bitmap> images = new ArrayList<Bitmap>();
         for (int i = startIndex; i < endIndex; ++i) {
-            ApplicationInfo info = isflag ? (page==0 ? ctFirstPageApps.get(i) :
-                    ctApps.get(i)) : mApps.get(i);
+            ApplicationInfo info = isCTFlag
+                    ? ((page == 0) ? ctFirstPageApps.get(i) : ctApps.get(i))
+                    : mApps.get(i);
             PagedViewIcon icon = (PagedViewIcon) mLayoutInflater.inflate(
                     R.layout.apps_customize_application, layout, false);
             icon.applyFromApplicationInfo(info, true, this);
@@ -1650,9 +1658,9 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         }
 
         if (sortBy == Utilities.SORT_BY_ALPHABET) {
-            Collections.sort(mApps, LauncherModel.getAppNameComparator());
+            Collections.sort(mApps, LauncherModel.APP_NAME_COMPARATOR);
         } else {
-            Collections.sort(mApps, LauncherModel.getAppCountComparator());
+            Collections.sort(mApps, LauncherModel.APP_COUNT_COMPARATOR);
         }
 
         if (mPreInstallConfig) {
@@ -1685,7 +1693,7 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
                     }
                 } else {
                     int index = Collections.binarySearch(mApps, info,
-                            LauncherModel.getAppNameComparator());
+                        LauncherModel.APP_NAME_COMPARATOR);
                     if (index < 0) {
                         mApps.add(-(index + 1), info);
                     }
@@ -1707,7 +1715,7 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
                     }
                 }else{
                     int index = Collections.binarySearch(mApps, item,
-                            LauncherModel.getAppCountComparator());
+                        LauncherModel.APP_COUNT_COMPARATOR);
                     if (index < 0) {
                         index = -(index+1);
                     }
@@ -1755,11 +1763,24 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
     private void removeAppsWithoutInvalidate(ArrayList<ApplicationInfo> list) {
         // loop through all the apps and remove apps that have the same component
         int length = list.size();
+        final int INVALID_INDEX = -1;
         for (int i = 0; i < length; ++i) {
             ApplicationInfo info = list.get(i);
-            int removeIndex = findAppByComponent(mApps, info);
-            if (removeIndex > -1) {
-                mApps.remove(removeIndex);
+            if(ctFirstPageApps.contains(info)) { //for CT first page
+                int removeCTFirstPageIndex = findAppByComponent(ctFirstPageApps, info);
+                if (removeCTFirstPageIndex > INVALID_INDEX) {
+                    ctFirstPageApps.remove(removeCTFirstPageIndex);
+                }
+            } else if(ctApps.contains(info)){ //for CT
+                int removeCTIndex = findAppByComponent(ctApps, info);
+                if (removeCTIndex > INVALID_INDEX) {
+                    ctApps.remove(removeCTIndex);
+                }
+            } else {
+                int removeIndex = findAppByComponent(mApps, info);
+                if (removeIndex > INVALID_INDEX) {
+                    mApps.remove(removeIndex);
+                }
             }
         }
     }
@@ -1925,7 +1946,7 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         if (mPreInstallConfig) {
             mApps.removeAll(mPreAppList);
         }
-        Collections.sort(mApps, LauncherModel.getAppNameComparator());
+        Collections.sort(mApps, LauncherModel.APP_NAME_COMPARATOR);
         if (mPreInstallConfig) {
             mApps.addAll(0,mPreAppList);
         }
@@ -1937,7 +1958,7 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         if (mPreInstallConfig) {
             mApps.removeAll(mPreAppList);
         }
-        Collections.sort(mApps, LauncherModel.getAppCountComparator());
+        Collections.sort(mApps, LauncherModel.APP_COUNT_COMPARATOR);
         if (mPreInstallConfig) {
             mApps.addAll(0, mPreAppList);
         }
@@ -1960,7 +1981,7 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         if (mPreInstallConfig) {
             removePreInstallApps();
         }
-        Collections.sort(mApps, LauncherModel.getAppCountComparator());
+        Collections.sort(mApps, LauncherModel.APP_COUNT_COMPARATOR);
         if (mPreInstallConfig) {
             addPreInstallApps();
         }
@@ -2043,7 +2064,7 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
     }
 
     private void sortByCustomization() {
-        if(SHOW_CTAPP_FEATRUE){
+        if(mShowCTApp){
             ctApps.clear();
             ctFirstPageApps.clear();
             for (ApplicationInfo info:mApps) {
