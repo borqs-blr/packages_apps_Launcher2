@@ -136,6 +136,16 @@ public class Hotseat extends FrameLayout {
             }
         });
 
+        allAppsButton.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(android.view.View v) {
+                if (mLauncher != null) {
+                    mLauncher.onClickAllAppsButton(v);
+                }
+                return true;
+            }
+        });
+
         // Note: We do this to ensure that the hotseat is always laid out in the orientation of
         // the hotseat in order regardless of which orientation they were added
         int x = getCellXFromOrder(mAllAppsButtonRank);
