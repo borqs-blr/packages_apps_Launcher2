@@ -277,8 +277,13 @@ public class WallpaperChooserDialogFragment extends DialogFragment implements
         protected Bitmap doInBackground(Integer... params) {
             if (isCancelled()) return null;
             try {
-                return BitmapFactory.decodeResource(getResources(),
-                        mImages.get(params[0]), mOptions);
+                Activity activity = getActivity();
+                if(activity != null) {
+                    return BitmapFactory.decodeResource(activity.getResources(),
+                            mImages.get(params[0]), mOptions);
+                } else {
+                    return null;
+                }
             } catch (OutOfMemoryError e) {
                 return null;
             }
