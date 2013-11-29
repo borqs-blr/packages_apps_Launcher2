@@ -119,7 +119,7 @@
     <style name="QSBBar">
         <item name="android:orientation">horizontal</item>
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">@dimen/qsb_bar_height</item>
+        <item name="android:layout_height">25dp</item>
         <item name="android:layout_gravity">top|center_horizontal</item>
         <item name="android:paddingStart">@dimen/qsb_padding_left</item>
         <item name="android:paddingEnd">@dimen/qsb_padding_right</item>

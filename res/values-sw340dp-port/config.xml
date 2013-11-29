@@ -18,4 +18,5 @@
 <!-- Workspace -->
     <!-- Whether or not to fade the side pages -->
     <bool name="config_workspaceFadeAdjacentScreens">false</bool>
+    <integer name="cell_count_y">5</integer>
 </resources>
