@@ -29,6 +29,8 @@ import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.ActivityOptions;
 import android.app.SearchManager;
 import android.appwidget.AppWidgetHostView;
@@ -39,10 +41,14 @@ import android.content.BroadcastReceiver;
 import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
 import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnKeyListener;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -100,9 +106,11 @@ import com.android.common.Search;
 import com.android.internal.telephony.cat.AppInterface;
 import com.android.launcher.R;
 import com.android.launcher2.DropTarget.DragObject;
+import com.android.launcher2.LauncherSettings.LauncherInfo;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -131,10 +139,12 @@ public final class Launcher extends Activity
     static final boolean DEBUG_RESUME_TIME = false;
 
     private static final int MENU_GROUP_WALLPAPER = 1;
+    private static final int MENU_GROUP_SORT = MENU_GROUP_WALLPAPER + 1;
     private static final int MENU_WALLPAPER_SETTINGS = Menu.FIRST + 1;
     private static final int MENU_MANAGE_APPS = MENU_WALLPAPER_SETTINGS + 1;
     private static final int MENU_SYSTEM_SETTINGS = MENU_MANAGE_APPS + 1;
     private static final int MENU_HELP = MENU_SYSTEM_SETTINGS + 1;
+    private static final int MENU_SORT = MENU_HELP + 1;
 
     private static final int REQUEST_CREATE_SHORTCUT = 1;
     private static final int REQUEST_CREATE_APPWIDGET = 5;
@@ -147,8 +157,15 @@ public final class Launcher extends Activity
 
     static final String EXTRA_SHORTCUT_DUPLICATE = "duplicate";
 
+    static final String SORT_BY_METHOD = "sortby";
+
     static final int SCREEN_COUNT = 5;
     static final int DEFAULT_SCREEN = 2;
+
+    static final int DIALOG_SORT = 1;
+    private SharedPreferences mSharedPreferences;
+    private SortOnClickListener mSortListener = new SortOnClickListener();
+    private MyPreferenceChangeListener mMyPreferenceChangeListener;
 
     private static final String PREFERENCES = "launcher.preferences";
     // To turn on these properties, type
@@ -205,6 +222,8 @@ public final class Launcher extends Activity
 
     private static final Object sLock = new Object();
     private static int sScreen = DEFAULT_SCREEN;
+
+    private UpdateTask mUpdateInfoTask;
 
     // How long to wait before the new-shortcut animation automatically pans the workspace
     private static int NEW_APPS_ANIMATION_INACTIVE_TIMEOUT_SECONDS = 10;
@@ -314,6 +333,8 @@ public final class Launcher extends Activity
 
     private BubbleTextView mWaitingForResume;
 
+    private static boolean LUNCHER_SORT_ENABLED;
+
     private HideFromAccessibilityHelper mHideFromAccessibilityHelper
         = new HideFromAccessibilityHelper();
 
@@ -364,6 +385,9 @@ public final class Launcher extends Activity
         LauncherApplication app = ((LauncherApplication)getApplication());
         mSharedPrefs = getSharedPreferences(LauncherApplication.getSharedPreferencesKey(),
                 Context.MODE_PRIVATE);
+        mSharedPreferences = getSharedPreferences("launcher_info", 0);
+        mMyPreferenceChangeListener = new MyPreferenceChangeListener();
+        mSharedPreferences.registerOnSharedPreferenceChangeListener(mMyPreferenceChangeListener);
         mModel = app.setLauncher(this);
         mIconCache = app.getIconCache();
         mDragController = new DragController(this);
@@ -372,6 +396,8 @@ public final class Launcher extends Activity
         mAppWidgetManager = AppWidgetManager.getInstance(this);
         mAppWidgetHost = new LauncherAppWidgetHost(this, APPWIDGET_HOST_ID);
         mAppWidgetHost.startListening();
+
+        LUNCHER_SORT_ENABLED = getResources().getBoolean(R.bool.config_launcher_sort);
 
         // If we are getting an onCreate, we can actually preempt onResume and unset mPaused here,
         // this also ensures that any synchronous binding below doesn't re-trigger another
@@ -842,6 +868,7 @@ public final class Launcher extends Activity
         mPaused = true;
         mDragController.cancelDrag();
         mDragController.resetLastGestureUpTime();
+        removeDialog(DIALOG_SORT);
     }
 
     @Override
@@ -1609,6 +1636,7 @@ public final class Launcher extends Activity
         }
 
         getContentResolver().unregisterContentObserver(mWidgetObserver);
+        mSharedPreferences.unregisterOnSharedPreferenceChangeListener(mMyPreferenceChangeListener);
         unregisterReceiver(mCloseSystemDialogsReceiver);
 
         mDragLayer.clearAllResizeFrames();
@@ -1727,6 +1755,10 @@ public final class Launcher extends Activity
             .setIcon(android.R.drawable.ic_menu_preferences)
             .setIntent(settings)
             .setAlphabeticShortcut('P');
+        if (LUNCHER_SORT_ENABLED) {
+            menu.add(MENU_GROUP_SORT, MENU_SORT, 0, R.string.menu_sort)
+                .setIcon(android.R.drawable.ic_menu_sort_alphabetically);
+        }
         if (!helpUrl.isEmpty()) {
             menu.add(0, MENU_HELP, 0, R.string.menu_help)
                 .setIcon(android.R.drawable.ic_menu_help)
@@ -1745,7 +1777,8 @@ public final class Launcher extends Activity
         }
         boolean allAppsVisible = (mAppsCustomizeTabHost.getVisibility() == View.VISIBLE);
         menu.setGroupVisible(MENU_GROUP_WALLPAPER, !allAppsVisible);
-
+        boolean showSortMenu = (allAppsVisible && (mAppsCustomizeTabHost.getCurrentTab() == 0));
+        menu.setGroupVisible(MENU_GROUP_SORT, showSortMenu);
         return true;
     }
 
@@ -1754,6 +1787,9 @@ public final class Launcher extends Activity
         switch (item.getItemId()) {
         case MENU_WALLPAPER_SETTINGS:
             startWallpaper();
+            return true;
+        case MENU_SORT:
+            showDialog(DIALOG_SORT);
             return true;
         }
 
@@ -2033,11 +2069,24 @@ public final class Launcher extends Activity
             intent.setSourceBounds(new Rect(pos[0], pos[1],
                     pos[0] + v.getWidth(), pos[1] + v.getHeight()));
 
+            //If the clicked shortcut wasn't exist, show the toast of activity not found.
+            final ComponentName componentName = intent.getComponent();
             boolean success = startActivitySafely(v, intent, tag);
 
             if (success && v instanceof BubbleTextView) {
                 mWaitingForResume = (BubbleTextView) v;
                 mWaitingForResume.setStayPressed(true);
+            }
+
+            if (componentName != null) {
+                String packageName = componentName.getPackageName();
+                String className = componentName.getClassName();
+                mUpdateInfoTask = new UpdateTask();
+                mUpdateInfoTask.execute(packageName, className);
+                if (mSharedPreferences.getInt(SORT_BY_METHOD, Utilities.SORT_BY_ALPHABET)
+                        != Utilities.SORT_BY_ALPHABET) {
+                    updateSort(packageName,className);
+                }
             }
         } else if (tag instanceof FolderInfo) {
             if (v instanceof FolderIcon) {
@@ -2052,6 +2101,27 @@ public final class Launcher extends Activity
             }
         }
     }
+
+    private class UpdateTask extends AsyncTask<String, Void, String> {
+
+            //doInBackground
+            @Override
+            protected String doInBackground(String... params) {
+                Log.i(TAG, "doInBackground(Params... params) called" + params[0] + params[1]);
+                Utilities.updateLaunchInfo(getContentResolver(),params[0],params[1]);
+                return null;
+            }
+
+
+            //onPostExecute
+            @Override
+            protected void onPostExecute(String result) {
+                Log.i(TAG, "onPostExecute called");
+
+            }
+
+    }
+
 
     public boolean onTouch(View v, MotionEvent event) {
         // this is an intercepted event being forwarded from mWorkspace;
@@ -2455,6 +2525,35 @@ public final class Launcher extends Activity
 
     Workspace getWorkspace() {
         return mWorkspace;
+    }
+
+    @Override
+    protected Dialog onCreateDialog(int id) {
+        switch (id) {
+            case DIALOG_SORT:
+                return showSortDialog();
+        }
+
+        return super.onCreateDialog(id);
+    }
+
+    private AlertDialog showSortDialog () {
+        final int selected = mSharedPreferences.getInt(SORT_BY_METHOD, Utilities.SORT_BY_ALPHABET);
+        final CharSequence[] items = getResources().getStringArray(R.array.sort_order);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(getString(R.string.sort_order_text));
+        builder.setSingleChoiceItems(items, selected, mSortListener);
+        builder.setNegativeButton(android.R.string.cancel, mSortListener);
+        builder.setOnKeyListener(new OnKeyListener() {
+            @Override
+            public boolean onKey(DialogInterface dialog, int keyCode, KeyEvent event) {
+                if (keyCode == KeyEvent.KEYCODE_BACK) {
+                    removeDialog(DIALOG_SORT);
+                }
+                return true;
+            }
+        });
+        return builder.create();
     }
 
     // Now a part of LauncherModel.Callbacks. Used to reorder loading steps.
@@ -3702,7 +3801,16 @@ public final class Launcher extends Activity
         Runnable setAllAppsRunnable = new Runnable() {
             public void run() {
                 if (mAppsCustomizeContent != null) {
-                    mAppsCustomizeContent.setApps(apps);
+                    boolean firstLoad = mSharedPreferences.getBoolean("firstload", true);
+                    if (firstLoad) {
+                        addAppInfo(apps);
+                        firstLoad = false;
+                        Editor editor = mSharedPreferences.edit();
+                        editor.putBoolean("firstload", firstLoad);
+                        editor.commit();
+                    }
+                    int sort_by = mSharedPreferences.getInt(SORT_BY_METHOD, Utilities.SORT_BY_ALPHABET);
+                    mAppsCustomizeContent.setApps(apps, sort_by);
                 }
             }
         };
@@ -3731,6 +3839,7 @@ public final class Launcher extends Activity
      * Implementation of the method from LauncherModel.Callbacks.
      */
     public void bindAppsAdded(final ArrayList<ApplicationInfo> apps) {
+        addAppInfo(apps);
         if (waitUntilResume(new Runnable() {
                 public void run() {
                     bindAppsAdded(apps);
@@ -3739,9 +3848,9 @@ public final class Launcher extends Activity
             return;
         }
 
-
         if (mAppsCustomizeContent != null) {
-            mAppsCustomizeContent.addApps(apps);
+            int sort_by = mSharedPreferences.getInt(SORT_BY_METHOD, Utilities.SORT_BY_ALPHABET);
+            mAppsCustomizeContent.addApps(apps,sort_by);
         }
     }
 
@@ -3764,7 +3873,8 @@ public final class Launcher extends Activity
         }
 
         if (mAppsCustomizeContent != null) {
-            mAppsCustomizeContent.updateApps(apps);
+            int sort_by = mSharedPreferences.getInt(SORT_BY_METHOD, Utilities.SORT_BY_ALPHABET);
+            mAppsCustomizeContent.updateApps(apps,sort_by);
         }
     }
 
@@ -3796,6 +3906,7 @@ public final class Launcher extends Activity
 
         if (mAppsCustomizeContent != null) {
             mAppsCustomizeContent.removeApps(appInfos);
+            removeAppInfo(packageNames);
         }
 
         // Notify the drag controller
@@ -4073,6 +4184,86 @@ public final class Launcher extends Activity
         for (int i = 0; i < sDumpLogs.size(); i++) {
             writer.println("  " + sDumpLogs.get(i));
         }
+    }
+
+    public void addAppInfo(ArrayList<ApplicationInfo> apps){
+
+        ContentResolver cr = getContentResolver();
+        final int N = apps.size();
+        Log.i(TAG,"addAppInfo() : size = "+N);
+        //ArrayList<ContentValues> contentValuesArray = new ArrayList<ContentValues>();
+        ContentValues[] contentValuesArray = new ContentValues[N];
+
+        for(int i=0;i<N;i++){
+            final ApplicationInfo item = apps.get(i);
+            final ContentValues contentValues = new ContentValues();
+            contentValues.put(LauncherInfo.PACKAGE_NAME, item.componentName.getPackageName());
+            contentValues.put(LauncherInfo.CLASS_NAME, item.componentName.getClassName());
+            contentValues.put(LauncherInfo.TITLE,(String)item.title);
+            //contentValuesArray.add(contentValues);
+            contentValuesArray[i]=contentValues;
+        }
+        //ContentValues[] contentValues = (ContentValues[])(contentValuesArray.toArray());
+        int count = cr.bulkInsert(LauncherInfo.CONTENT_URI, contentValuesArray);
+        Log.i(TAG,"addAppInfo() : bulkInsert count = "+count);
+    }
+
+    public void removeAppInfo(ArrayList<String> packageNames){
+        ContentResolver cr = getContentResolver();
+        final int N = packageNames.size();
+        final String where = "package_name=?";
+        String[] selectionArgs = new String[N];
+        StringBuilder sb = new StringBuilder();
+        for (int i=0; i<N; i++) {
+            final String packageNmae = packageNames.get(i);
+            sb.append(where).append(" or ");
+            //In sql query statement, variables of "where" should equals
+            //the number of "selectionArgs".
+            selectionArgs[i] = packageNmae;
+        }
+        String selection = sb.substring(0, sb.lastIndexOf(" or"));
+        Log.i(TAG,"removeAppInfo(): selection="+selection
+                + " && selectionArgs size="+selectionArgs.length);
+        cr.delete(LauncherInfo.CONTENT_URI, selection, selectionArgs);
+    }
+
+
+    private class SortOnClickListener implements DialogInterface.OnClickListener
+    {
+
+        public void onClick(DialogInterface dialog, int which) {
+            removeDialog(DIALOG_SORT);
+            if (which >= 0) {
+                Editor editor = mSharedPreferences.edit();
+                editor.putInt(SORT_BY_METHOD, which);
+                editor.commit();
+            }
+        }
+    }
+
+    private class MyPreferenceChangeListener implements
+        SharedPreferences.OnSharedPreferenceChangeListener{
+
+        public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
+                String key) {
+            if(key.equals(SORT_BY_METHOD)){
+                int sortBy = sharedPreferences.getInt(SORT_BY_METHOD,
+                        Utilities.SORT_BY_ALPHABET);
+                Log.i(TAG,"onSharedPreferenceChanged(): sortby=" + sortBy
+                        +" && size="+mModel.getAppsList().size());
+                //mAllAppsGrid.sortApp(mModel.getAppsList(),sortBy);
+                mAppsCustomizeContent.sortApp(sortBy);
+            }
+        }
+
+    }
+
+    public void updateSort(String packageName,String className){
+        mAppsCustomizeContent.updateOnClick(packageName,className);
+    }
+
+    public SharedPreferences getSharedPreferences(){
+        return mSharedPreferences;
     }
 
     public static void dumpDebugLogsToConsole() {
