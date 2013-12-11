@@ -22,6 +22,7 @@ import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -29,6 +30,7 @@ import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Point;
@@ -53,11 +55,14 @@ import android.widget.Toast;
 
 import com.android.launcher.R;
 import com.android.launcher2.DropTarget.DragObject;
+import com.android.launcher2.LauncherSettings.LauncherInfo;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.lang.ref.WeakReference;
+import java.util.Comparator;
 
 /**
  * A simple callback interface which also provides the results of the task.
@@ -150,6 +155,7 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         PagedViewIcon.PressedCallback, PagedViewWidget.ShortPressListener,
         LauncherTransitionable {
     static final String TAG = "AppsCustomizePagedView";
+    private static final boolean SHOW_CTAPP_FEATRUE = false;
 
     /**
      * The different content types that this paged view can show.
@@ -181,6 +187,8 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
     // Caching
     private Canvas mCanvas;
     private IconCache mIconCache;
+
+    private UpdateTask mUpdateInfoTask;
 
     // Dimens
     private int mContentWidth;
@@ -242,6 +250,49 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
 
     private boolean mInBulkBind;
     private boolean mNeedToUpdatePageCountsAndInvalidateData;
+    private int mMode = 0;
+    private static final String[] SORT_PROJECTION = { LauncherInfo.CLASS_NAME,
+            LauncherInfo.LAUNCH_COUNT };
+
+    // For fix location function
+    private static final String PRE_PACKAGE_NAME = "com.android.launcher.res";
+    private static final String PRE_CLASS_IDENTIFIER = "pre_install_class";
+    private static final String CT_CLASS_IDENTIFIER = "ct_install_class";
+    private static final String CT_FIRSTPAGE_IDENTIFIER = "ct_firstpage_app";
+    // Set first two pages for CT apps
+    private static final int CT_CUSTOMIZED_PAGE_COUNT = 2;
+    private boolean mPreInstallConfig = false;
+    private ArrayList<String> mPreClassArray = new ArrayList<String> ();
+    private ArrayList<String> mCTClassArray = new ArrayList<String> ();
+    private ArrayList<String> mCTFirstPageArray = new ArrayList<String> ();
+    private ArrayList<ApplicationInfo> mPreAppList = new ArrayList<ApplicationInfo>();
+    private ArrayList<ApplicationInfo> ctApps = new ArrayList<ApplicationInfo>();
+    private ArrayList<ApplicationInfo> ctFirstPageApps = new ArrayList<ApplicationInfo>();
+
+    private final Comparator<ApplicationInfo> PREAPP_CT_COMPARATOR
+            = new Comparator<ApplicationInfo>() {
+        public final int compare(ApplicationInfo a, ApplicationInfo b) {
+            int indexA = mPreClassArray.indexOf(a.componentName.getClassName());
+            int indexB = mPreClassArray.indexOf(b.componentName.getClassName());
+            return indexA < indexB ? -1 : 1;
+        }
+    };
+    private final Comparator<ApplicationInfo> APP_CT_COMPARATOR
+            = new Comparator<ApplicationInfo>() {
+        public final int compare(ApplicationInfo a, ApplicationInfo b) {
+            int indexA = mCTClassArray.indexOf(a.componentName.getClassName());
+            int indexB = mCTClassArray.indexOf(b.componentName.getClassName());
+            return indexA < indexB ? -1 : 1;
+        }
+    };
+    private final Comparator<ApplicationInfo> APP_CT_FIRSTPAGE_COMPARATOR
+            = new Comparator<ApplicationInfo>() {
+        public final int compare(ApplicationInfo a, ApplicationInfo b) {
+            int indexA = mCTFirstPageArray.indexOf(a.componentName.getClassName());
+            int indexB = mCTFirstPageArray.indexOf(b.componentName.getClassName());
+            return indexA < indexB ? -1 : 1;
+        }
+    };
 
     public AppsCustomizePagedView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -275,6 +326,11 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         // Unless otherwise specified this view is important for accessibility.
         if (getImportantForAccessibility() == View.IMPORTANT_FOR_ACCESSIBILITY_AUTO) {
             setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        }
+        configClassArray(context, mPreClassArray, PRE_CLASS_IDENTIFIER, true);
+        if (SHOW_CTAPP_FEATRUE) {
+            configClassArray(context, mCTClassArray, CT_CLASS_IDENTIFIER, false);
+            configClassArray(context, mCTFirstPageArray, CT_FIRSTPAGE_IDENTIFIER, false);
         }
     }
 
@@ -517,6 +573,14 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
             mLauncher.updateWallpaperVisibility(true);
             mLauncher.startActivitySafely(v, appInfo.intent, appInfo);
 
+            final String packageName = appInfo.componentName.getPackageName();
+            final String className = appInfo.componentName.getClassName();
+            mUpdateInfoTask = new UpdateTask();
+            mUpdateInfoTask.execute(packageName, className);
+
+            if (mMode == Utilities.SORT_BY_FAVORITE) {
+                updateOnClick(packageName,className);
+            }
         } else if (v instanceof PagedViewWidget) {
             // Let the user know that they have to long press to add a widget
             if (mWidgetInstructionToast != null) {
@@ -538,6 +602,25 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
             bounce.setInterpolator(new AccelerateInterpolator());
             bounce.start();
         }
+    }
+
+    private class UpdateTask extends AsyncTask<String, Void, String> {
+
+        //doInBackground
+        @Override
+        protected String doInBackground(String... params) {
+            Log.i(TAG, "doInBackground(Params... params) called" + params[0] + params[1]);
+            Utilities.updateLaunchInfo(mLauncher.getContentResolver(), params[0], params[1]);
+            return null;
+        }
+
+        //onPostExecute
+        @Override
+        protected void onPostExecute(String result) {
+            Log.i(TAG, "onPostExecute(Result result) called");
+
+        }
+
     }
 
     public boolean onKey(View v, int keyCode, KeyEvent event) {
@@ -1023,15 +1106,28 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         // ensure that we have the right number of items on the pages
         final boolean isRtl = isLayoutRtl();
         int numCells = mCellCountX * mCellCountY;
-        int startIndex = page * numCells;
-        int endIndex = Math.min(startIndex + numCells, mApps.size());
-        PagedViewCellLayout layout = (PagedViewCellLayout) getPageAt(page);
+        boolean isflag = SHOW_CTAPP_FEATRUE && (page <= 1); //set page 1 & 2 to CT's app
+        int startIndex = isflag ? 0 : (SHOW_CTAPP_FEATRUE && page>1 ?
+            (page-2)* numCells : page * numCells);
+        int ctEndIndex = page==0 ? Math.min(startIndex + numCells, ctFirstPageApps.size())
+            : Math.min(startIndex + numCells, ctApps.size());
+        int defEndIndex = Math.min(startIndex + numCells, mApps.size());
+        int endIndex = isflag ? ctEndIndex : defEndIndex ;
+
+        PagedViewCellLayout layout;
+        try {
+            layout = (PagedViewCellLayout) getPageAt(page);
+        } catch (ClassCastException e) {
+            Log.e(TAG, "syncAppsPageItems, catch the ClassCastException.");
+            return;
+        }
 
         layout.removeAllViewsOnPage();
         ArrayList<Object> items = new ArrayList<Object>();
         ArrayList<Bitmap> images = new ArrayList<Bitmap>();
         for (int i = startIndex; i < endIndex; ++i) {
-            ApplicationInfo info = mApps.get(i);
+            ApplicationInfo info = isflag ? (page==0 ? ctFirstPageApps.get(i) :
+                    ctApps.get(i)) : mApps.get(i);
             PagedViewIcon icon = (PagedViewIcon) mLayoutInflater.inflate(
                     R.layout.apps_customize_application, layout, false);
             icon.applyFromApplicationInfo(info, true, this);
@@ -1545,24 +1641,104 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         }
     }
 
-    public void setApps(ArrayList<ApplicationInfo> list) {
-        mApps = list;
-        Collections.sort(mApps, LauncherModel.getAppNameComparator());
+    public void setApps(ArrayList<ApplicationInfo> list, int sortBy) {
+        mApps = addCountInformation(list);
+        mMode = sortBy;
+        if (mPreInstallConfig) {
+            configPreInstallAppInfos();
+            removePreInstallApps();
+        }
+
+        if (sortBy == Utilities.SORT_BY_ALPHABET) {
+            Collections.sort(mApps, LauncherModel.getAppNameComparator());
+        } else {
+            Collections.sort(mApps, LauncherModel.getAppCountComparator());
+        }
+
+        if (mPreInstallConfig) {
+            addPreInstallApps();
+        }
+
+        sortByCustomization();
         updatePageCountsAndInvalidateData();
     }
-    private void addAppsWithoutInvalidate(ArrayList<ApplicationInfo> list) {
+    private void addAppsWithoutInvalidate(ArrayList<ApplicationInfo> list, int sortBy) {
         // We add it in place, in alphabetical order
         int count = list.size();
-        for (int i = 0; i < count; ++i) {
-            ApplicationInfo info = list.get(i);
-            int index = Collections.binarySearch(mApps, info, LauncherModel.getAppNameComparator());
-            if (index < 0) {
-                mApps.add(-(index + 1), info);
+        final int INVALID_INDEX = -1;
+
+        if (sortBy == Utilities.SORT_BY_ALPHABET) {
+            for (int i = 0; i < count; ++i) {
+                ApplicationInfo info = list.get(i);
+                if (mCTFirstPageArray.indexOf(info.componentName.getClassName()) > INVALID_INDEX) {
+                    //for CT first page
+                    int index = Collections.binarySearch(ctFirstPageApps, info,
+                            APP_CT_FIRSTPAGE_COMPARATOR);
+                    if (index < 0) {
+                        ctFirstPageApps.add(-(index + 1), info);
+                    }
+                } else if (mCTClassArray.indexOf(info.componentName.getClassName())
+                        > INVALID_INDEX) {
+                    int index = Collections.binarySearch(ctApps, info, APP_CT_COMPARATOR);
+                    if (index < 0){
+                        ctApps.add(-(index + 1), info);
+                    }
+                } else {
+                    int index = Collections.binarySearch(mApps, info,
+                            LauncherModel.getAppNameComparator());
+                    if (index < 0) {
+                        mApps.add(-(index + 1), info);
+                    }
+                }
+            }
+        } else {
+            for (int j=0; j<count;j++) {
+                final ApplicationInfo item = list.get(j);
+                if(mCTFirstPageArray.indexOf(item.componentName.getClassName()) > -1) {
+                    int index = Collections.binarySearch(ctFirstPageApps, item,
+                            APP_CT_FIRSTPAGE_COMPARATOR);
+                    if (index < 0){
+                        ctFirstPageApps.add(-(index + 1), item);
+                    }
+                } else if (mCTClassArray.indexOf(item.componentName.getClassName()) > -1) {
+                    int index = Collections.binarySearch(ctApps, item, APP_CT_COMPARATOR);
+                    if (index < 0){
+                        ctApps.add(-(index + 1), item);
+                    }
+                }else{
+                    int index = Collections.binarySearch(mApps, item,
+                            LauncherModel.getAppCountComparator());
+                    if (index < 0) {
+                        index = -(index+1);
+                    }
+                    mApps.add(index,item);
+                }
             }
         }
     }
-    public void addApps(ArrayList<ApplicationInfo> list) {
-        addAppsWithoutInvalidate(list);
+    public void addApps(ArrayList<ApplicationInfo> list, int sortBy) {
+        //remove appinfo if list contains preinstallapk
+        ArrayList<ApplicationInfo> preList = new ArrayList<ApplicationInfo>();
+        for(int i = 0; i< list.size(); i++){
+            ApplicationInfo info = list.get(i);
+            for(String preClass: mPreClassArray){
+                if(preClass.equals(info.componentName.getClassName())) {
+                    preList.add(info);
+                }
+            }
+        }
+
+        mPreAppList.addAll(preList);
+        list.removeAll(preList);
+        Collections.sort(mPreAppList, PREAPP_CT_COMPARATOR);
+
+        if (mPreInstallConfig) {
+            removePreInstallApps();
+        }
+        addAppsWithoutInvalidate(list, sortBy);
+        if (mPreInstallConfig) {
+            addPreInstallApps();
+        }
         updatePageCountsAndInvalidateData();
     }
     private int findAppByComponent(List<ApplicationInfo> list, ApplicationInfo item) {
@@ -1587,17 +1763,39 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
             }
         }
     }
+
     public void removeApps(ArrayList<ApplicationInfo> appInfos) {
         removeAppsWithoutInvalidate(appInfos);
         updatePageCountsAndInvalidateData();
+
     }
-    public void updateApps(ArrayList<ApplicationInfo> list) {
+
+    public void updateApps(ArrayList<ApplicationInfo> list, int sortBy) {
         // We remove and re-add the updated applications list because it's properties may have
         // changed (ie. the title), and this will ensure that the items will be in their proper
         // place in the list.
         removeAppsWithoutInvalidate(list);
-        addAppsWithoutInvalidate(list);
+
+        mLauncher.removeAppInfo(getPackageNameFromAppInfo(list));
+        if (mPreInstallConfig) {
+            removePreInstallApps();
+        }
+        addAppsWithoutInvalidate(list,sortBy);
+        mLauncher.addAppInfo(list);
+        if (mPreInstallConfig) {
+            addPreInstallApps();
+        }
         updatePageCountsAndInvalidateData();
+    }
+
+    private ArrayList<String> getPackageNameFromAppInfo(ArrayList<ApplicationInfo> list) {
+        if (list == null) return null;
+        ArrayList<String> packagesNames = new ArrayList<String>();
+        int size = list.size();
+        for (int i = 0; i < size; i++) {
+            packagesNames.add(list.get(i).componentName.getPackageName());
+        }
+        return packagesNames;
     }
 
     public void reset() {
@@ -1706,5 +1904,163 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
         }
 
         return String.format(getContext().getString(stringId), page + 1, count);
+    }
+
+    public void sortApp(int sortBy) {
+        mMode = sortBy;
+
+        switch(sortBy){
+        case 0:
+            sortByAlphabet();
+            break;
+        case 1:
+            sortByFavorite();
+            break;
+        default:
+            break;
+        }
+    }
+
+    private void sortByAlphabet() {
+        if (mPreInstallConfig) {
+            mApps.removeAll(mPreAppList);
+        }
+        Collections.sort(mApps, LauncherModel.getAppNameComparator());
+        if (mPreInstallConfig) {
+            mApps.addAll(0,mPreAppList);
+        }
+        updatePageCounts();
+        invalidatePageData();
+    }
+
+    private void sortByFavorite() {
+        if (mPreInstallConfig) {
+            mApps.removeAll(mPreAppList);
+        }
+        Collections.sort(mApps, LauncherModel.getAppCountComparator());
+        if (mPreInstallConfig) {
+            mApps.addAll(0, mPreAppList);
+        }
+        updatePageCounts();
+        invalidatePageData();
+    }
+
+    public void updateOnClick(String packageName, String className) {
+        if (mPreInstallConfig && mPreClassArray.contains(className)) {
+            return;
+        }
+        final int count = mApps.size();
+        for(int i=0;i<count;i++){
+            if((packageName.equals(mApps.get(i).componentName.getPackageName()))
+                    &&(className.equals(mApps.get(i).componentName.getClassName()))){
+                mApps.get(i).count++;
+                break;
+            }
+        }
+        if (mPreInstallConfig) {
+            removePreInstallApps();
+        }
+        Collections.sort(mApps, LauncherModel.getAppCountComparator());
+        if (mPreInstallConfig) {
+            addPreInstallApps();
+        }
+        updatePageCounts();
+        invalidatePageData();
+    }
+
+    private void configClassArray(Context context, ArrayList arrayList,
+            String arrayName, boolean isPreInstallClass) {
+        Context prePackageContext = null;
+        try {
+            prePackageContext = context.createPackageContext(PRE_PACKAGE_NAME,
+                    Context.CONTEXT_IGNORE_SECURITY);
+        } catch (Exception e) {
+            Log.e(TAG, "Create Res Apk Failed");
+        }
+
+        if (prePackageContext != null) {
+            final int resId = prePackageContext.getResources().getIdentifier(
+                    arrayName, "array", PRE_PACKAGE_NAME);
+            if (resId == 0) {
+                return;
+            }
+            final String[] preApps = prePackageContext.getResources().getStringArray(resId);
+            int size = preApps.length;
+            if(isPreInstallClass){
+                mPreInstallConfig = true;
+            }
+            arrayList.clear();
+            for (int i=0; i<size; i++) {
+                arrayList.add(preApps[i]);
+            }
+        }
+    }
+
+    private void configPreInstallAppInfos() {
+        mPreAppList.clear();
+        int N = mApps.size();
+        int preCount = mPreClassArray.size();
+        for (int i =0; i<preCount; i++) {
+            for (int j=0; j<N; j++) {
+                final ApplicationInfo item = mApps.get(j);
+                if (mPreClassArray.get(i).equals(item.componentName.getClassName())) {
+                    mPreAppList.add(item);
+                }
+            }
+        }
+    }
+
+    private ArrayList<ApplicationInfo> addCountInformation(ArrayList<ApplicationInfo> list) {
+        Cursor c = null;
+        try {
+            c = mLauncher.getContentResolver().query(LauncherInfo.CONTENT_URI,
+                    SORT_PROJECTION, null, null,null);
+            if (c != null && c.moveToFirst()) {
+                int count = list.size();
+                do{
+                    for(int j=0;j<count;j++) {
+                        if (c.getString(0).equals(list.get(j).componentName.getClassName())) {
+                            list.get(j).count = c.getInt(1);
+                            continue;
+                        }
+                    }
+                } while (c.moveToNext());
+            }
+        } finally {
+            if (c != null) {
+                c.close();
+            }
+        }
+        return list;
+    }
+
+    private void removePreInstallApps() {
+        mApps.removeAll(mPreAppList);
+    }
+
+    private void addPreInstallApps() {
+        mApps.addAll(0,mPreAppList);
+    }
+
+    private void sortByCustomization() {
+        if(SHOW_CTAPP_FEATRUE){
+            ctApps.clear();
+            ctFirstPageApps.clear();
+            for (ApplicationInfo info:mApps) {
+                String className = info.componentName.getClassName();
+                int index = mCTClassArray.indexOf(className);
+                if(index > -1){
+                    ctApps.add(info);
+                }
+                int firstPageIndex = mCTFirstPageArray.indexOf(className);
+                if(firstPageIndex > -1){
+                    ctFirstPageApps.add(info);
+                }
+            }
+            mApps.removeAll(ctApps);
+            Collections.sort(ctApps, APP_CT_COMPARATOR);
+            mApps.removeAll(ctFirstPageApps);
+            Collections.sort(ctFirstPageApps, APP_CT_FIRSTPAGE_COMPARATOR);
+        }
     }
 }

@@ -275,4 +275,10 @@ s -->
     <!-- Dummy string [CHAR_LIMIT=60] -->
     <string name="custom_workspace_cling_description_2"></string>
 
+    <string name="menu_sort">Sort</string>
+    <string name="sort_order_text">Sort order</string>
+    <string-array name="sort_order">
+        <item>Sort by alphabet</item>
+        <item>Sort by favorite</item>
+    </string-array>
 </resources>

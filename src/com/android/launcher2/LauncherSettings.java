@@ -233,4 +233,17 @@ class LauncherSettings {
          */
         static final String DISPLAY_MODE = "displayMode";
     }
+
+    static final class LauncherInfo{
+        static final Uri CONTENT_URI = Uri.parse("content://" +
+                LauncherProvider.AUTHORITY + "/" + LauncherProvider.LAUNCHERINFO);
+
+        static final String PACKAGE_NAME = "package_name";
+
+        static final String CLASS_NAME = "class_name";
+
+        static final String TITLE = "title";
+
+        static final String LAUNCH_COUNT = "launch_count";
+    }
 }

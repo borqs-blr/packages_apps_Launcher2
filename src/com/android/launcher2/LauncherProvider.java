@@ -66,7 +66,7 @@ public class LauncherProvider extends ContentProvider {
 
     private static final String DATABASE_NAME = "launcher.db";
 
-    private static final int DATABASE_VERSION = 12;
+    private static final int DATABASE_VERSION = 13;
 
     static final String AUTHORITY = "com.android.launcher2.settings";
 
@@ -79,6 +79,7 @@ public class LauncherProvider extends ContentProvider {
 
     private static final String ACTION_APPWIDGET_DEFAULT_WORKSPACE_CONFIGURE =
             "com.android.launcher.action.APPWIDGET_DEFAULT_WORKSPACE_CONFIGURE";
+    static final String LAUNCHERINFO = "launcher_info";
 
     /**
      * {@link Uri} triggered at any registered {@link android.database.ContentObserver} when
@@ -124,7 +125,7 @@ public class LauncherProvider extends ContentProvider {
 
     private static long dbInsertAndCheck(DatabaseHelper helper,
             SQLiteDatabase db, String table, String nullColumnHack, ContentValues values) {
-        if (!values.containsKey(LauncherSettings.Favorites._ID)) {
+        if (TABLE_FAVORITES.equals(table) && !values.containsKey(LauncherSettings.Favorites._ID)) {
             throw new RuntimeException("Error: attempting to add item without specifying an id");
         }
         return db.insert(table, nullColumnHack, values);
@@ -185,13 +186,11 @@ public class LauncherProvider extends ContentProvider {
 
     @Override
     public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-        SqlArguments args = new SqlArguments(uri, selection, selectionArgs);
-
-        SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-        int count = db.update(args.table, values, args.where, args.args);
-        if (count > 0) sendNotify(uri);
-
-        return count;
+           SqlArguments args = new SqlArguments(uri, selection, selectionArgs);
+           SQLiteDatabase db = mOpenHelper.getWritableDatabase();
+           int count = db.update(args.table, values, args.where, args.args);
+           if (count > 0) sendNotify(uri);
+           return count;
     }
 
     private void sendNotify(Uri uri) {
@@ -292,6 +291,14 @@ public class LauncherProvider extends ContentProvider {
                     "icon BLOB," +
                     "uri TEXT," +
                     "displayMode INTEGER" +
+                    ");");
+
+            db.execSQL("CREATE TABLE launcher_info (" +
+                    "_id INTEGER PRIMARY KEY," +
+                    "package_name TEXT," +
+                    "class_name TEXT," +
+                    "title TEXT," +
+                    "launch_count INTEGER DEFAULT 0" +
                     ");");
 
             // Database was just created, so wipe any previous widgets
@@ -502,11 +509,30 @@ public class LauncherProvider extends ContentProvider {
                 updateContactsShortcuts(db);
                 version = 12;
             }
+            if(version < 13){
+                db.execSQL("CREATE TABLE launcher_info (" +
+                        "_id INTEGER PRIMARY KEY," +
+                        "package_name TEXT," +
+                        "class_name TEXT," +
+                        "title TEXT," +
+                        "launch_count INTEGER DEFAULT 0" +
+                        ");");
+                version = 13;
+            }
 
             if (version != DATABASE_VERSION) {
                 Log.w(TAG, "Destroying all old data.");
                 db.execSQL("DROP TABLE IF EXISTS " + TABLE_FAVORITES);
+                db.execSQL("DROP TABLE IF EXISTS " + LAUNCHERINFO);
                 onCreate(db);
+            }
+        }
+
+        @Override
+        public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+            Log.i(TAG,"Down grade version from " + oldVersion+" to " + newVersion);
+            if (oldVersion > 12 && newVersion <= 12) {
+                db.execSQL("DROP TABLE IF EXISTS " + LAUNCHERINFO);
             }
         }
 

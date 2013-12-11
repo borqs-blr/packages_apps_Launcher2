@@ -18,8 +18,11 @@ package com.android.launcher2;
 
 import java.util.Random;
 
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.res.Resources;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
@@ -35,6 +38,7 @@ import android.graphics.drawable.PaintDrawable;
 import android.util.DisplayMetrics;
 
 import com.android.launcher.R;
+import com.android.launcher2.LauncherSettings.LauncherInfo;
 
 /**
  * Various utilities shared amongst the Launcher's classes.
@@ -47,6 +51,9 @@ final class Utilities {
     private static int sIconHeight = -1;
     private static int sIconTextureWidth = -1;
     private static int sIconTextureHeight = -1;
+
+    public static final int SORT_BY_ALPHABET = 0;
+    public static final int SORT_BY_FAVORITE = 1;
 
     private static final Paint sBlurPaint = new Paint();
     private static final Paint sGlowColorPressedPaint = new Paint();
@@ -271,5 +278,30 @@ final class Utilities {
 
     static int generateRandomId() {
         return new Random(System.currentTimeMillis()).nextInt(1 << 24);
+    }
+
+    static void updateLaunchInfo(ContentResolver contentResolver, String packageName,
+            String className){
+        String[] projection = {LauncherInfo.LAUNCH_COUNT};
+        String selection = "package_name=? AND class_name=?";
+        String[] selectionArgs = {packageName,className};
+        Cursor c = null;
+        long count = 0;
+        try{
+            c = contentResolver.query(LauncherInfo.CONTENT_URI, projection, selection,
+                    selectionArgs, null);
+            if(c!=null && c.moveToFirst()){
+                count = c.getLong(0);
+            }
+        }
+        finally{
+            if(c!=null){
+                c.close();
+            }
+        }
+
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(LauncherInfo.LAUNCH_COUNT, ++count);
+        contentResolver.update(LauncherInfo.CONTENT_URI, contentValues, selection, selectionArgs);
     }
 }

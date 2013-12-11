@@ -2516,6 +2516,25 @@ public class LauncherModel extends BroadcastReceiver {
             }
         };
     }
+
+    public static final Comparator<ApplicationInfo> getAppCountComparator() {
+        final Collator collator = Collator.getInstance();
+        return new Comparator<ApplicationInfo>() {
+            public final int compare(ApplicationInfo a, ApplicationInfo b) {
+                int result = 0;
+                if (a.count != b.count) {
+                    result = b.count - a.count;
+                } else {
+                    result = collator.compare(a.title.toString(), b.title.toString());
+                    if (result == 0) {
+                        result = a.componentName.compareTo(b.componentName);
+                    }
+                }
+                return result;
+            }
+        };
+    }
+
     public static final Comparator<ApplicationInfo> APP_INSTALL_TIME_COMPARATOR
             = new Comparator<ApplicationInfo>() {
         public final int compare(ApplicationInfo a, ApplicationInfo b) {
@@ -2616,5 +2635,9 @@ public class LauncherModel extends BroadcastReceiver {
         } else {
             Log.d(TAG, "mLoaderTask=null");
         }
+    }
+
+    public ArrayList<ApplicationInfo> getAppsList() {
+        return mBgAllAppsList.data;
     }
 }
