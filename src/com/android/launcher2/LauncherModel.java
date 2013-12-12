@@ -61,6 +61,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.io.File;
 import java.util.Set;
 
 /**
@@ -1925,6 +1926,13 @@ public class LauncherModel extends BroadcastReceiver {
                 startIndex = i;
                 for (int j=0; i<N && j<batchSize; j++) {
                     // This builds the icon bitmaps.
+                    String sourceDir = apps.get(i).activityInfo.applicationInfo.sourceDir;
+
+                    if(!new File(sourceDir).exists()){
+                        i++;
+                        continue;
+                    }
+
                     mBgAllAppsList.add(new ApplicationInfo(packageManager, apps.get(i),
                             mIconCache, mLabelCache));
                     i++;
@@ -2504,37 +2512,33 @@ public class LauncherModel extends BroadcastReceiver {
         return folderInfo;
     }
 
-    public static final Comparator<ApplicationInfo> getAppNameComparator() {
-        final Collator collator = Collator.getInstance();
-        return new Comparator<ApplicationInfo>() {
-            public final int compare(ApplicationInfo a, ApplicationInfo b) {
-                int result = collator.compare(a.title.toString(), b.title.toString());
+    private static final Collator sCollator = Collator.getInstance();
+    public static final Comparator<ApplicationInfo> APP_NAME_COMPARATOR
+            = new Comparator<ApplicationInfo>() {
+        public final int compare(ApplicationInfo a, ApplicationInfo b) {
+            int result = sCollator.compare(a.title.toString(), b.title.toString());
+            if (result == 0) {
+                result = a.componentName.compareTo(b.componentName);
+            }
+            return result;
+        }
+    };
+
+    public static final Comparator<ApplicationInfo> APP_COUNT_COMPARATOR
+            = new Comparator<ApplicationInfo>() {
+        public final int compare(ApplicationInfo a, ApplicationInfo b) {
+            int result = 0;
+            if (a.count != b.count) {
+                result = b.count - a.count;
+            } else {
+                result = sCollator.compare(a.title.toString(), b.title.toString());
                 if (result == 0) {
                     result = a.componentName.compareTo(b.componentName);
                 }
-                return result;
             }
-        };
-    }
-
-    public static final Comparator<ApplicationInfo> getAppCountComparator() {
-        final Collator collator = Collator.getInstance();
-        return new Comparator<ApplicationInfo>() {
-            public final int compare(ApplicationInfo a, ApplicationInfo b) {
-                int result = 0;
-                if (a.count != b.count) {
-                    result = b.count - a.count;
-                } else {
-                    result = collator.compare(a.title.toString(), b.title.toString());
-                    if (result == 0) {
-                        result = a.componentName.compareTo(b.componentName);
-                    }
-                }
-                return result;
-            }
-        };
-    }
-
+            return result;
+        }
+    };
     public static final Comparator<ApplicationInfo> APP_INSTALL_TIME_COMPARATOR
             = new Comparator<ApplicationInfo>() {
         public final int compare(ApplicationInfo a, ApplicationInfo b) {

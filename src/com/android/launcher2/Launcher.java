@@ -2075,6 +2075,21 @@ public final class Launcher extends Activity
 
             //If the clicked shortcut wasn't exist, show the toast of activity not found.
             final ComponentName componentName = intent.getComponent();
+            if(componentName != null){
+                String name = componentName.getPackageName();
+                PackageManager packageManager = getPackageManager();
+                try{
+                    String sourceDir = (packageManager.getApplicationInfo(name, 0)).sourceDir;
+                    if(!new File(sourceDir).exists()){
+                        Toast.makeText(this, R.string.activity_not_found,
+                            Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                } catch (NameNotFoundException e) {
+                    Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
             boolean success = startActivitySafely(v, intent, tag);
 
             if (success && v instanceof BubbleTextView) {
