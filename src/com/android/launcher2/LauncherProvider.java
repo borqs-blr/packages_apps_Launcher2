@@ -81,6 +81,8 @@ public class LauncherProvider extends ContentProvider {
             "com.android.launcher.action.APPWIDGET_DEFAULT_WORKSPACE_CONFIGURE";
     static final String LAUNCHERINFO = "launcher_info";
 
+    private static boolean LAUNCHER_SHORTCUT_ENABLED;
+
     /**
      * {@link Uri} triggered at any registered {@link android.database.ContentObserver} when
      * {@link AppWidgetHost#deleteHost()} is called during database creation.
@@ -215,7 +217,12 @@ public class LauncherProvider extends ContentProvider {
 
             // Use default workspace resource if none provided
             if (workspaceResId == 0) {
-                workspaceResId = sp.getInt(DEFAULT_WORKSPACE_RESOURCE_ID, R.xml.default_workspace);
+                if(!LAUNCHER_SHORTCUT_ENABLED)
+                    workspaceResId = sp.getInt(DEFAULT_WORKSPACE_RESOURCE_ID,
+                        R.xml.default_workspace);
+                else
+                    workspaceResId = sp.getInt(DEFAULT_WORKSPACE_RESOURCE_ID,
+                        R.xml.ct_default_workspace);
             }
 
             // Populate favorites table with initial favorites
@@ -246,6 +253,10 @@ public class LauncherProvider extends ContentProvider {
         DatabaseHelper(Context context) {
             super(context, DATABASE_NAME, null, DATABASE_VERSION);
             mContext = context;
+
+            LAUNCHER_SHORTCUT_ENABLED =
+                context.getResources().getBoolean(R.bool.config_launcher_shortcut);
+
             mAppWidgetHost = new AppWidgetHost(context, Launcher.APPWIDGET_HOST_ID);
 
             // In the case where neither onCreate nor onUpgrade gets called, we read the maxId from
