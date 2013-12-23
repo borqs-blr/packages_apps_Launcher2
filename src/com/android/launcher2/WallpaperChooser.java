@@ -21,15 +21,27 @@ import com.android.launcher.R;
 import android.app.Activity;
 import android.app.DialogFragment;
 import android.app.Fragment;
+import android.content.Intent;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Bundle;
+import android.text.TextUtils;
+import android.view.Window;
 
 public class WallpaperChooser extends Activity {
     @SuppressWarnings("unused")
     private static final String TAG = "Launcher.WallpaperChooser";
+    private static final String INTENT_EXTRA = "packagename";
 
     @Override
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
+        Intent intent = getIntent();
+        String packageName = null;
+        if (intent != null) {
+            packageName = intent.getStringExtra(INTENT_EXTRA);
+        }
+        WallpaperChooserDialogFragment.setExtraWallpaperPackageName(packageName);
+
         setContentView(R.layout.wallpaper_chooser_base);
 
         Fragment fragmentView =

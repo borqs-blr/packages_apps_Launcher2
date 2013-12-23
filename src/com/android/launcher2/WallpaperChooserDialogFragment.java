@@ -21,6 +21,7 @@ import android.app.DialogFragment;
 import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -29,6 +30,7 @@ import android.graphics.ColorFilter;
 import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -61,15 +63,30 @@ public class WallpaperChooserDialogFragment extends DialogFragment implements
     private WallpaperLoader mLoader;
     private WallpaperDrawable mWallpaperDrawable = new WallpaperDrawable();
 
+    private Context resPackageCtx = null;
+    private static String RES_PACKAGENAME = null;
+
     public static WallpaperChooserDialogFragment newInstance() {
         WallpaperChooserDialogFragment fragment = new WallpaperChooserDialogFragment();
         fragment.setCancelable(true);
         return fragment;
     }
 
+    public static void setExtraWallpaperPackageName(String packagename) {
+        RES_PACKAGENAME = packagename;
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            if (!TextUtils.isEmpty(RES_PACKAGENAME)) {
+                resPackageCtx = ((Context)getActivity()).createPackageContext(RES_PACKAGENAME,
+                        Context.CONTEXT_IGNORE_SECURITY);
+            }
+        } catch (Exception e) {
+            Log.e("Res_Update", "Create Res Apk Failed");
+        }
         if (savedInstanceState != null && savedInstanceState.containsKey(EMBEDDED_KEY)) {
             mEmbedded = savedInstanceState.getBoolean(EMBEDDED_KEY);
         } else {
@@ -157,13 +174,32 @@ public class WallpaperChooserDialogFragment extends DialogFragment implements
     }
 
     private void selectWallpaper(int position) {
+        Context resPackageCtx = null;
         try {
-            WallpaperManager wpm = (WallpaperManager) getActivity().getSystemService(
-                    Context.WALLPAPER_SERVICE);
-            wpm.setResource(mImages.get(position));
-            Activity activity = getActivity();
-            activity.setResult(Activity.RESULT_OK);
-            activity.finish();
+            if (!TextUtils.isEmpty(RES_PACKAGENAME)) {
+                Activity activity = getActivity();
+                resPackageCtx = activity.createPackageContext(RES_PACKAGENAME,
+                         Context.CONTEXT_IGNORE_SECURITY);
+            }
+        } catch (Exception e) {
+            Log.e("Res_Update", "Create Res Apk Failed");
+        }
+
+        try {
+            if (null == resPackageCtx) {
+                WallpaperManager wpm = (WallpaperManager) getActivity().getSystemService(
+                        Context.WALLPAPER_SERVICE);
+                wpm.setResource(mImages.get(position));
+                Activity activity = getActivity();
+                activity.setResult(Activity.RESULT_OK);
+                activity.finish();
+            } else {
+                Intent data = new Intent();
+                data.putExtra("resid", mImages.get(position));
+                Activity activity = getActivity();
+                getActivity().setResult(Activity.RESULT_OK, data);
+                activity.finish();
+            }
         } catch (IOException e) {
             Log.e(TAG, "Failed to set wallpaper: " + e);
         }
@@ -192,15 +228,30 @@ public class WallpaperChooserDialogFragment extends DialogFragment implements
         mThumbs = new ArrayList<Integer>(24);
         mImages = new ArrayList<Integer>(24);
 
-        final Resources resources = getResources();
+        Resources resources = null;
+        int wallpaperId = 0;
+        int extra_wallpaperId = 0;
+
+        if (null == resPackageCtx) {
+            Log.i(TAG, "resPackageCtx is null, we use the default wallpaper.");
+            resources = getResources();
+            wallpaperId = R.array.wallpapers;
+            extra_wallpaperId = R.array.extra_wallpapers;
+        } else {
+            Log.i(TAG, "resPackageCtx = " + resPackageCtx);
+            resources = resPackageCtx.getResources();
+            wallpaperId = resources.getIdentifier("wallpapers", "array", RES_PACKAGENAME);
+            extra_wallpaperId = resources.getIdentifier("extra_wallpapers", "array",
+                    RES_PACKAGENAME);
+        }
         // Context.getPackageName() may return the "original" package name,
         // com.android.launcher2; Resources needs the real package name,
         // com.android.launcher. So we ask Resources for what it thinks the
         // package name should be.
-        final String packageName = resources.getResourcePackageName(R.array.wallpapers);
+        final String packageName = resources.getResourcePackageName(wallpaperId);
 
-        addWallpapers(resources, packageName, R.array.wallpapers);
-        addWallpapers(resources, packageName, R.array.extra_wallpapers);
+        addWallpapers(resources, packageName, wallpaperId);
+        addWallpapers(resources, packageName, extra_wallpaperId);
     }
 
     private void addWallpapers(Resources resources, String packageName, int list) {
@@ -251,8 +302,14 @@ public class WallpaperChooserDialogFragment extends DialogFragment implements
             ImageView image = (ImageView) view.findViewById(R.id.wallpaper_image);
 
             int thumbRes = mThumbs.get(position);
-            image.setImageResource(thumbRes);
-            Drawable thumbDrawable = image.getDrawable();
+            Drawable thumbDrawable = null;
+            if (null == resPackageCtx) {
+                image.setImageResource(thumbRes);
+                thumbDrawable = image.getDrawable();
+            } else {
+                thumbDrawable = resPackageCtx.getResources().getDrawable(thumbRes);
+                image.setImageDrawable(thumbDrawable);
+            }
             if (thumbDrawable != null) {
                 thumbDrawable.setDither(true);
             } else {
@@ -279,8 +336,13 @@ public class WallpaperChooserDialogFragment extends DialogFragment implements
             try {
                 Activity activity = getActivity();
                 if(activity != null) {
-                    return BitmapFactory.decodeResource(activity.getResources(),
-                            mImages.get(params[0]), mOptions);
+                    if (null == resPackageCtx) {
+                        return BitmapFactory.decodeResource(getResources(),
+                                mImages.get(params[0]), mOptions);
+                    } else {
+                        return BitmapFactory.decodeResource(resPackageCtx.getResources(),
+                                mImages.get(params[0]), mOptions);
+                    }
                 } else {
                     return null;
                 }
