@@ -2064,7 +2064,18 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
     }
 
     private void addPreInstallApps() {
-        mApps.addAll(0,mPreAppList);
+        for (int j = 0; j < mPreAppList.size(); ++j) {
+            ApplicationInfo info = mPreAppList.get(j);
+            for (int i = 0; i < mApps.size(); ++i) {
+                ApplicationInfo item = mApps.get(i);
+                if (info.componentName.getClassName()
+                        .compareTo(item.componentName.getClassName()) == 0) {
+                    mApps.remove(i);
+                    break;
+                }
+            }
+        }
+        mApps.addAll(0, mPreAppList);
     }
 
     private void sortByCustomization() {
