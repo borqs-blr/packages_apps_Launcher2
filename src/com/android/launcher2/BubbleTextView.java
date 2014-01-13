@@ -216,6 +216,7 @@ public class BubbleTextView extends TextView {
                     mPressedOrFocusedBackground = createGlowingOutline(
                             mTempCanvas, mPressedGlowColor, mPressedOutlineColor);
                 }
+                setPressed(true);
                 // Invalidate so the pressed state is visible, or set a flag so we know that we
                 // have to call invalidate as soon as the state is "pressed"
                 if (isPressed()) {
