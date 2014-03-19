@@ -21,8 +21,8 @@
 <favorites xmlns:launcher="http://schemas.android.com/apk/res/com.android.launcher">
     <!-- UX_Enhance_defaultAppWidget -->
     <appwidget
-        launcher:packageName="com.qti.calendarwidget"
-        launcher:className="com.qti.calendarwidget.CalendarWidget"
+        launcher:packageName="com.qualcomm.qti.calendarwidget"
+        launcher:className="com.qualcomm.qti.calendarwidget.CalendarWidget"
         launcher:screen="0"
         launcher:x="0"
         launcher:y="0"
@@ -84,8 +84,8 @@
 
     <!-- UX_Enhance_screen [3] -->
     <favorite
-        launcher:packageName="com.android.gallery3d"
-        launcher:className="com.android.camera.Camera"
+        launcher:packageName="com.android.camera2"
+        launcher:className="com.android.camera.CameraActivity"
         launcher:screen="3"
         launcher:x="0"
         launcher:y="4" />
