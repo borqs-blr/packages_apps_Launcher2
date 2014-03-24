@@ -94,4 +94,5 @@
 
     <bool name="config_launcher_sort">false</bool>
     <bool name="config_launcher_page">false</bool>
+    <string name="mms_main_activity">com.android.mms.ui.ConversationList</string>
 </resources>
