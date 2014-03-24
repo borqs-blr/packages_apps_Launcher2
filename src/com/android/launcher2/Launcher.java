@@ -3401,6 +3401,7 @@ public final class Launcher extends Activity
                     R.id.market_button, activityName, R.drawable.ic_launcher_market_holo,
                     TOOLBAR_ICON_METADATA_NAME);
             marketButton.setVisibility(View.VISIBLE);
+            marketButton.setEnabled(true);
         } else {
             // We should hide and disable the view so that we don't try and restore the visibility
             // of it when we swap between drag & normal states from IconDropTarget subclasses.
