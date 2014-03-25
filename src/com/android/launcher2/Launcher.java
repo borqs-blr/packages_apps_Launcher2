@@ -280,6 +280,8 @@ public final class Launcher extends Activity
     // Keep track of whether the user has left launcher
     private static boolean sPausedFromUserAction = false;
 
+    private static final boolean ENABLE_VOICE_SEARCH = false;
+
     private Bundle mSavedInstanceState;
 
     private LauncherModel mModel;
@@ -3292,7 +3294,7 @@ public final class Launcher extends Activity
         final SearchManager searchManager =
                 (SearchManager) getSystemService(Context.SEARCH_SERVICE);
         ComponentName activityName = searchManager.getGlobalSearchActivity();
-        if (activityName != null) {
+        if (ENABLE_VOICE_SEARCH && activityName != null) {
             int coi = getCurrentOrientationIndexForGlobalIcons();
             sGlobalSearchIcon[coi] = updateButtonWithIconFromExternalActivity(
                     R.id.search_button, activityName, R.drawable.ic_home_search_normal_holo,
