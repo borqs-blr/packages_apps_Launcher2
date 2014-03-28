@@ -145,6 +145,7 @@ public class Hotseat extends FrameLayout {
                 return true;
             }
         });
+        mContent.enableHardwareLayers();
 
         // Note: We do this to ensure that the hotseat is always laid out in the orientation of
         // the hotseat in order regardless of which orientation they were added
