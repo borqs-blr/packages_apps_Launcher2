@@ -2099,7 +2099,7 @@ public final class Launcher extends Activity
                 mWaitingForResume.setStayPressed(true);
             }
 
-            if (componentName != null) {
+            if (LUNCHER_SORT_ENABLED && componentName != null) {
                 String packageName = componentName.getPackageName();
                 String className = componentName.getClassName();
                 mUpdateInfoTask = new UpdateTask();
