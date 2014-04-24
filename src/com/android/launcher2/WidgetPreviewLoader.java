@@ -350,9 +350,18 @@ public class WidgetPreviewLoader {
     }
 
     private void clearDb() {
-        SQLiteDatabase db = mDb.getWritableDatabase();
-        // Delete everything
-        db.delete(CacheDb.TABLE_NAME, null, null);
+        new AsyncTask<Void, Void, Void>() {
+
+            @Override
+            protected Void doInBackground(Void... params) {
+                SQLiteDatabase db = mDb.getWritableDatabase();
+                // Delete everything
+                db.delete(CacheDb.TABLE_NAME, null, null);
+
+                return null;
+            }
+
+        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, (Void) null);
     }
 
     public static void removeFromDb(final CacheDb cacheDb, final String packageName) {
