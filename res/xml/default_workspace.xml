@@ -21,15 +21,6 @@
 <favorites xmlns:launcher="http://schemas.android.com/apk/res/com.android.launcher">
     <!-- UX_Enhance_defaultAppWidget -->
     <appwidget
-        launcher:packageName="com.qualcomm.qti.calendarwidget"
-        launcher:className="com.qualcomm.qti.calendarwidget.CalendarWidget"
-        launcher:screen="0"
-        launcher:x="0"
-        launcher:y="0"
-        launcher:spanX="4"
-        launcher:spanY="4" />
-
-    <appwidget
         launcher:packageName="com.android.settings"
         launcher:className="com.android.settings.widget.SettingsAppWidgetProvider"
         launcher:screen="1"
