@@ -253,4 +253,33 @@ class AllAppsList {
         }
         return null;
     }
+
+    public ApplicationInfo unreadNumbersChanged(Context context, ComponentName component,
+            int unreadNum) {
+        if (component == null) {
+            return null;
+        }
+        final List<ResolveInfo> matches =
+                findActivitiesForPackage(context, component.getPackageName());
+        int count = matches.size();
+        if (count > 0) {
+            for (int i = 0; i < count; i ++) {
+                ResolveInfo info = matches.get(i);
+                if (component.getPackageName().equals(info.activityInfo.applicationInfo.packageName)
+                        && component.getClassName().equals(info.activityInfo.name)) {
+                    ApplicationInfo applicationInfo = findApplicationInfoLocked(
+                            component.getPackageName(), component.getClassName());
+                    if (applicationInfo == null) {
+                        return null;
+                    } else {
+                        applicationInfo.unreadNum = unreadNum;
+                        mIconCache.remove(applicationInfo.componentName);
+                        mIconCache.getTitleAndIcon(applicationInfo, info, null);
+                        return applicationInfo;
+                    }
+                }
+            }
+        }
+        return null;
+    }
 }

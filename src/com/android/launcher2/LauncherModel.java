@@ -140,6 +140,9 @@ public class LauncherModel extends BroadcastReceiver {
     static final HashMap<Object, byte[]> sBgDbIconCache = new HashMap<Object, byte[]>();
     // </ only access in worker thread >
 
+    public static final String ACTION_UNREAD_CHANGED =
+            "com.android.launcher.action.UNREAD_CHANGED";
+
     private IconCache mIconCache;
     private Bitmap mDefaultIcon;
 
@@ -168,6 +171,54 @@ public class LauncherModel extends BroadcastReceiver {
         public void bindSearchablesChanged();
         public void onPageBoundSynchronously(int page);
     }
+
+    private HashMap<ComponentName, UnreadInfo> unreadChangedMap =
+            new HashMap<ComponentName, LauncherModel.UnreadInfo>();
+
+    private class UnreadInfo {
+        ComponentName mComponentName;
+        int mUnreadNum;
+
+        public UnreadInfo(ComponentName componentName, int unreadNum) {
+            mComponentName = componentName;
+            mUnreadNum = unreadNum;
+        }
+    }
+
+    private class UnreadNumberChangeTask implements Runnable {
+        public void run() {
+            ArrayList<UnreadInfo> unreadInfos = new ArrayList<LauncherModel.UnreadInfo>();
+            synchronized (unreadChangedMap) {
+                unreadInfos.addAll(unreadChangedMap.values());
+                unreadChangedMap.clear();
+            }
+            Context context = mApp;
+            final Callbacks callbacks = mCallbacks != null ? mCallbacks.get() : null;
+            if (callbacks == null) {
+                Log.w(TAG, "Nobody to tell about the new app.  Launcher is probably loading.");
+                return;
+            }
+            final ArrayList<ApplicationInfo> unreadChangeFinal = new ArrayList<ApplicationInfo>();
+            for (UnreadInfo uInfo : unreadInfos) {
+                ApplicationInfo info = mBgAllAppsList.unreadNumbersChanged(context,
+                        uInfo.mComponentName, uInfo.mUnreadNum);
+                if (info != null) {
+                    unreadChangeFinal.add(info);
+                }
+            }
+            if (unreadChangeFinal.isEmpty()) return;
+            mHandler.post(new Runnable() {
+                public void run() {
+                    Callbacks cb = mCallbacks != null ? mCallbacks.get() : null;
+                    if (callbacks == cb && cb != null) {
+                        callbacks.bindAppsUpdated(unreadChangeFinal);
+                    }
+                }
+            });
+        }
+    }
+
+    private UnreadNumberChangeTask mUnreadUpdateTask = new UnreadNumberChangeTask();
 
     LauncherModel(LauncherApplication app, IconCache iconCache) {
         mAppsCanBeOnExternalStorage = !Environment.isExternalStorageEmulated();
@@ -876,6 +927,17 @@ public class LauncherModel extends BroadcastReceiver {
                     callbacks.bindSearchablesChanged();
                 }
             }
+        } else if (ACTION_UNREAD_CHANGED.equals(action)) {
+            ComponentName componentName = intent.getParcelableExtra("component_name");
+            int unreadNum = intent.getIntExtra("unread_number", 0);
+            Log.i(TAG, "onreceive UNREAD_CHANGED componentName is " + componentName
+                    + " unreadNum is " + unreadNum);
+            if (componentName == null) return;
+            synchronized (unreadChangedMap) {
+                unreadChangedMap.put(componentName, new UnreadInfo(componentName, unreadNum));
+            }
+            sWorker.removeCallbacks(mUnreadUpdateTask);
+            sWorker.post(mUnreadUpdateTask);
         }
     }
 

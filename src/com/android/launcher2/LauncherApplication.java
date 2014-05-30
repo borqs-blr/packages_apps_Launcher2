@@ -39,6 +39,7 @@ public class LauncherApplication extends Application {
     private static int sLongPressTimeout = 300;
     private static final String sSharedPreferencesKey = "com.android.launcher2.prefs";
     WeakReference<LauncherProvider> mLauncherProvider;
+    public static boolean LAUNCHER_SHOW_UNREAD_NUMBER;
 
     @Override
     public void onCreate() {
@@ -51,6 +52,8 @@ public class LauncherApplication extends Application {
         mWidgetPreviewCacheDb = new WidgetPreviewLoader.CacheDb(this);
         mIconCache = new IconCache(this);
         mModel = new LauncherModel(this, mIconCache);
+        LAUNCHER_SHOW_UNREAD_NUMBER = getResources().getBoolean(
+                R.bool.config_launcher_show_unread_number);
 
         // Register intent receivers
         IntentFilter filter = new IntentFilter(Intent.ACTION_PACKAGE_ADDED);
@@ -70,6 +73,11 @@ public class LauncherApplication extends Application {
         filter = new IntentFilter();
         filter.addAction(SearchManager.INTENT_ACTION_SEARCHABLES_CHANGED);
         registerReceiver(mModel, filter);
+        filter = new IntentFilter();
+        if (LAUNCHER_SHOW_UNREAD_NUMBER) {
+            filter.addAction(LauncherModel.ACTION_UNREAD_CHANGED);
+            registerReceiver(mModel, filter);
+        }
 
         // Register for changes to the favorites
         ContentResolver resolver = getContentResolver();
