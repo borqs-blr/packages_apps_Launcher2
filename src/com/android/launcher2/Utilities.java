@@ -26,12 +26,16 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
+import android.graphics.Paint.Style;
 import android.graphics.PaintFlagsDrawFilter;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.PaintDrawable;
@@ -68,6 +72,46 @@ final class Utilities {
     }
     static int sColors[] = { 0xffff0000, 0xff00ff00, 0xff0000ff };
     static int sColorIndex = 0;
+
+   static Bitmap createIconBitmap(Context context, Drawable icon, int count) {
+       Bitmap b = createIconBitmap(icon, context);
+       if (!LauncherApplication.LAUNCHER_SHOW_UNREAD_NUMBER || count <= 0) {
+           return b;
+       }
+       int textureWidth = b.getWidth();
+       final Resources resources = context.getResources();
+       final Canvas canvas = sCanvas;
+       canvas.setBitmap(b);
+
+       float textsize = resources.getDimension(R.dimen.infomation_count_textsize);
+       Paint countPaint = new Paint(Paint.ANTI_ALIAS_FLAG|Paint.DEV_KERN_TEXT_FLAG);
+       countPaint.setColor(Color.WHITE);
+       countPaint.setTextSize(textsize);
+       countPaint.setTypeface(Typeface.DEFAULT_BOLD);
+
+       float count_hight = resources.getDimension(R.dimen.infomation_count_height);
+       float padding = resources.getDimension(R.dimen.infomation_count_padding);
+       int  textwidth = (int) (countPaint.measureText(String.valueOf(count)) + 1);
+       float width =textwidth + padding * 2;
+       width = Math.max(width, resources.getDimensionPixelSize(R.dimen.infomation_count_min_width));
+
+       RectF rect = new RectF(textureWidth - width -1, 1, textureWidth - 1, count_hight + 1);
+       Paint paint = new Paint();
+       paint.setAntiAlias(true);
+       paint.setColor(Color.RED);
+       canvas.drawRoundRect(rect , 10, 10, paint);
+
+       paint.setColor(Color.WHITE);
+       paint.setStyle(Style.STROKE);
+       paint.setStrokeWidth(2);
+       canvas.drawRoundRect(rect , 10, 10, paint);
+
+       float x = textureWidth - (width + textwidth )/ 2;
+       float y = textsize - 1;
+       canvas.drawText(String.valueOf(count), x, y, countPaint);
+
+       return b;
+    }
 
     /**
      * Returns a bitmap suitable for the all apps view. Used to convert pre-ICS
