@@ -55,6 +55,7 @@ import java.net.URISyntaxException;
 import java.text.Collator;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -2205,6 +2206,23 @@ public class LauncherModel extends BroadcastReceiver {
                 final ArrayList<String> removedPackageNames =
                         new ArrayList<String>(Arrays.asList(packages));
 
+                // Update the launcher db to reflect the removal of apps
+                if (permanent) {
+                    for (String pn : removedPackageNames) {
+                        ArrayList<ItemInfo> infos = getItemInfoForPackageName(pn);
+                        for (ItemInfo i : infos) {
+                            deleteItemFromDatabase(context, i);
+                        }
+                    }
+                } else {
+                    for (ApplicationInfo a : removedApps) {
+                        ArrayList<ItemInfo> infos =
+                                getItemInfoForComponentName(a.componentName);
+                        for (ItemInfo i : infos) {
+                            deleteItemFromDatabase(context, i);
+                        }
+                    }
+                }
                 mHandler.post(new Runnable() {
                     public void run() {
                         Callbacks cb = mCallbacks != null ? mCallbacks.get() : null;
@@ -2228,6 +2246,59 @@ public class LauncherModel extends BroadcastReceiver {
                 }
             });
         }
+    }
+
+    public interface ItemInfoFilter {
+        public boolean filterItem(ItemInfo parent, ItemInfo info, ComponentName cn);
+    }
+
+    static ArrayList<ItemInfo> filterItemInfos(Collection<ItemInfo> infos,
+            ItemInfoFilter f) {
+        HashSet<ItemInfo> filtered = new HashSet<ItemInfo>();
+        for (ItemInfo i : infos) {
+            if (i instanceof ShortcutInfo) {
+                ShortcutInfo info = (ShortcutInfo) i;
+                ComponentName cn = info.intent.getComponent();
+                if (cn != null && f.filterItem(null, info, cn)) {
+                    filtered.add(info);
+                }
+            } else if (i instanceof FolderInfo) {
+                FolderInfo info = (FolderInfo) i;
+                for (ShortcutInfo s : info.contents) {
+                    ComponentName cn = s.intent.getComponent();
+                    if (cn != null && f.filterItem(info, s, cn)) {
+                        filtered.add(s);
+                    }
+                }
+            } else if (i instanceof LauncherAppWidgetInfo) {
+                LauncherAppWidgetInfo info = (LauncherAppWidgetInfo) i;
+                ComponentName cn = info.providerName;
+                if (cn != null && f.filterItem(null, info, cn)) {
+                    filtered.add(info);
+                }
+            }
+        }
+        return new ArrayList<ItemInfo>(filtered);
+    }
+
+    private ArrayList<ItemInfo> getItemInfoForPackageName(final String pn) {
+        ItemInfoFilter filter  = new ItemInfoFilter() {
+            @Override
+            public boolean filterItem(ItemInfo parent, ItemInfo info, ComponentName cn) {
+                return cn.getPackageName().equals(pn);
+            }
+        };
+        return filterItemInfos(sBgItemsIdMap.values(), filter);
+    }
+
+    private ArrayList<ItemInfo> getItemInfoForComponentName(final ComponentName cname) {
+        ItemInfoFilter filter  = new ItemInfoFilter() {
+            @Override
+            public boolean filterItem(ItemInfo parent, ItemInfo info, ComponentName cn) {
+                return cn.equals(cname);
+            }
+        };
+        return filterItemInfos(sBgItemsIdMap.values(), filter);
     }
 
     // Returns a list of ResolveInfos/AppWindowInfos in sorted order
