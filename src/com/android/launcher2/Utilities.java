@@ -87,28 +87,27 @@ final class Utilities {
        Paint countPaint = new Paint(Paint.ANTI_ALIAS_FLAG|Paint.DEV_KERN_TEXT_FLAG);
        countPaint.setColor(Color.WHITE);
        countPaint.setTextSize(textsize);
-       countPaint.setTypeface(Typeface.DEFAULT_BOLD);
 
+       String text = String.valueOf(count);
+       if (count >= 1000) {
+           text = "999+";
+       }
        float count_hight = resources.getDimension(R.dimen.infomation_count_height);
        float padding = resources.getDimension(R.dimen.infomation_count_padding);
-       int  textwidth = (int) (countPaint.measureText(String.valueOf(count)) + 1);
+       float radius = resources.getDimension(R.dimen.infomation_count_circle_radius);
+       int  textwidth = (int) (countPaint.measureText(text) + 1);
        float width =textwidth + padding * 2;
        width = Math.max(width, resources.getDimensionPixelSize(R.dimen.infomation_count_min_width));
 
        RectF rect = new RectF(textureWidth - width -1, 1, textureWidth - 1, count_hight + 1);
        Paint paint = new Paint();
        paint.setAntiAlias(true);
-       paint.setColor(Color.RED);
-       canvas.drawRoundRect(rect , 10, 10, paint);
+       paint.setColor(resources.getColor(R.color.infomation_count_circle_color));
+       canvas.drawRoundRect(rect , radius, radius, paint);
 
-       paint.setColor(Color.WHITE);
-       paint.setStyle(Style.STROKE);
-       paint.setStrokeWidth(2);
-       canvas.drawRoundRect(rect , 10, 10, paint);
-
-       float x = textureWidth - (width + textwidth )/ 2;
-       float y = textsize - 1;
-       canvas.drawText(String.valueOf(count), x, y, countPaint);
+       float x = textureWidth - (width + textwidth ) / 2 - 1;
+       float y = textsize;
+       canvas.drawText(text, x, y, countPaint);
 
        return b;
     }
