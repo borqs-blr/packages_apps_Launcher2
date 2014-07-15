@@ -40,6 +40,7 @@ public class LauncherApplication extends Application {
     private static final String sSharedPreferencesKey = "com.android.launcher2.prefs";
     WeakReference<LauncherProvider> mLauncherProvider;
     public static boolean LAUNCHER_SHOW_UNREAD_NUMBER;
+    public static boolean LAUNCHER_HIDE_HOMELOCATION;
 
     @Override
     public void onCreate() {
@@ -54,6 +55,9 @@ public class LauncherApplication extends Application {
         mModel = new LauncherModel(this, mIconCache);
         LAUNCHER_SHOW_UNREAD_NUMBER = getResources().getBoolean(
                 R.bool.config_launcher_show_unread_number);
+
+        LAUNCHER_HIDE_HOMELOCATION = getResources().getBoolean(
+                R.bool.config_launcher_hide_homelocation);
 
         // Register intent receivers
         IntentFilter filter = new IntentFilter(Intent.ACTION_PACKAGE_ADDED);

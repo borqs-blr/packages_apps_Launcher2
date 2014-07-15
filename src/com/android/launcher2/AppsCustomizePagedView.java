@@ -269,6 +269,8 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
     private ArrayList<ApplicationInfo> ctApps = new ArrayList<ApplicationInfo>();
     private ArrayList<ApplicationInfo> ctFirstPageApps = new ArrayList<ApplicationInfo>();
 
+    private final String HOMELOCATION_PACKAGE_NAME = "homelocation";
+
     private final Comparator<ApplicationInfo> PREAPP_CT_COMPARATOR
             = new Comparator<ApplicationInfo>() {
         public final int compare(ApplicationInfo a, ApplicationInfo b) {
@@ -1654,6 +1656,8 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
     }
 
     public void setApps(ArrayList<ApplicationInfo> list, int sortBy) {
+        hideAppAtLauncher(list);
+
         mApps = addCountInformation(list);
         mMode = sortBy;
         if (mPreInstallConfig) {
@@ -2097,6 +2101,22 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
             Collections.sort(ctApps, APP_CT_COMPARATOR);
             mApps.removeAll(ctFirstPageApps);
             Collections.sort(ctFirstPageApps, APP_CT_FIRSTPAGE_COMPARATOR);
+        }
+    }
+
+    private void hideAppAtLauncher(ArrayList<ApplicationInfo> list) {
+        if (LauncherApplication.LAUNCHER_HIDE_HOMELOCATION) {
+            for (int i = 0; i < list.size(); ++i) {
+                if (list.get(i) == null || list.get(i).componentName == null) {
+                    continue;
+                }
+
+                String packageName = list.get(i).componentName.getPackageName();
+
+                if (packageName != null && packageName.contains(HOMELOCATION_PACKAGE_NAME)) {
+                    list.remove(i);
+                }
+            }
         }
     }
 }
