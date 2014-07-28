@@ -581,7 +581,12 @@ public class CellLayout extends ViewGroup {
     }
 
     public void restoreInstanceState(SparseArray<Parcelable> states) {
-        dispatchRestoreInstanceState(states);
+        try {
+            // sometimes on rotating the phone, fail to restore its states
+            dispatchRestoreInstanceState(states);
+        } catch (IllegalArgumentException e) {
+            Log.w("Launcher2", "fail to restore its states");
+        }
     }
 
     @Override
