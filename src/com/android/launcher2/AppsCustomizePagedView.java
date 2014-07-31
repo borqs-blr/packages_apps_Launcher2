@@ -269,6 +269,9 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
     private ArrayList<ApplicationInfo> ctApps = new ArrayList<ApplicationInfo>();
     private ArrayList<ApplicationInfo> ctFirstPageApps = new ArrayList<ApplicationInfo>();
 
+    private int mWidth = 0;
+    private int mHeight = 0;
+
     private final String HOMELOCATION_PACKAGE_NAME = "homelocation";
 
     private final Comparator<ApplicationInfo> PREAPP_CT_COMPARATOR
@@ -499,7 +502,10 @@ public class AppsCustomizePagedView extends PagedViewWithDraggableItems implemen
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int height = MeasureSpec.getSize(heightMeasureSpec);
-        if (!isDataReady()) {
+        boolean measure = mWidth != width || mHeight != height;
+        mWidth = width;
+        mHeight = height;
+        if (!isDataReady() || measure) {
             if (!mApps.isEmpty() && !mWidgets.isEmpty()) {
                 setDataIsReady();
                 setMeasuredDimension(width, height);
