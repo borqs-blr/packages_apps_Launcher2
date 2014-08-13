@@ -1222,7 +1222,7 @@ public class CellLayout extends ViewGroup {
             mDragCenter.set(originX, originY);
         }
 
-        if (dragOutline == null && v == null) {
+        if (dragOutline == null || v == null) {
             return;
         }
 
