@@ -361,7 +361,7 @@ public class WidgetPreviewLoader {
                 return null;
             }
 
-        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, (Void) null);
+        }.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, (Void) null);
     }
 
     public static void removeFromDb(final CacheDb cacheDb, final String packageName) {
@@ -383,7 +383,7 @@ public class WidgetPreviewLoader {
                 }
                 return null;
             }
-        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, (Void) null);
+        }.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, (Void) null);
     }
 
     private Bitmap readFromDb(String name, Bitmap b) {
