@@ -183,6 +183,9 @@ public class WidgetPreviewLoader {
         if (!packageValid) {
             return null;
         }
+        if (mPreviewBitmapWidth <= 0 || mPreviewBitmapHeight <= 0) {
+            return null;
+        }
         if (packageValid) {
             synchronized(mLoadedPreviews) {
                 // check if it exists in our existing cache
@@ -209,7 +212,12 @@ public class WidgetPreviewLoader {
             }
         }
 
-        if (unusedBitmap == null) {
+        if (unusedBitmap == null || !unusedBitmap.isMutable() ||
+                unusedBitmap.getWidth() != mPreviewBitmapWidth ||
+                unusedBitmap.getHeight() != mPreviewBitmapHeight) {
+
+            if (unusedBitmap != null) { unusedBitmap.recycle(); }
+
             unusedBitmap = Bitmap.createBitmap(mPreviewBitmapWidth, mPreviewBitmapHeight,
                     Bitmap.Config.ARGB_8888);
         }
