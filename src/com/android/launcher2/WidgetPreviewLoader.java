@@ -465,7 +465,13 @@ public class WidgetPreviewLoader {
 
         Drawable drawable = null;
         if (previewImage != 0) {
-            drawable = mPackageManager.getDrawable(packageName, previewImage, null);
+            try {
+                drawable = mPackageManager.getDrawable(packageName, previewImage, null);
+            } catch (OutOfMemoryError e) {
+                Log.e(TAG, "OutOfMemeoryError : " + e);
+                // will generate a low resolution preview image if we couldn't load one later
+            }
+
             if (drawable == null) {
                 Log.w(TAG, "Can't load widget preview drawable 0x" +
                         Integer.toHexString(previewImage) + " for provider: " + provider);
@@ -484,8 +490,35 @@ public class WidgetPreviewLoader {
             if (cellHSpan < 1) cellHSpan = 1;
             if (cellVSpan < 1) cellVSpan = 1;
 
-            BitmapDrawable previewDrawable = (BitmapDrawable) mContext.getResources()
-                    .getDrawable(R.drawable.widget_preview_tile);
+            BitmapDrawable previewDrawable;
+
+            try {
+                previewDrawable = (BitmapDrawable) mContext.getResources()
+                        .getDrawable(R.drawable.widget_preview_tile);
+            } catch (OutOfMemoryError e) {
+                // generate a low resolution image
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inJustDecodeBounds = true;
+
+                Bitmap tmp = BitmapFactory.decodeResource(mContext.getResources(),
+                        R.drawable.widget_preview_tile, options);
+
+                if (tmp != null) {
+                    tmp.recycle();
+                    tmp = null;
+                }
+
+                options.inJustDecodeBounds = false;
+                options.inSampleSize = 2; // 1/4 of original size
+
+                try {
+                    previewDrawable = new BitmapDrawable(BitmapFactory.decodeResource(
+                            mContext.getResources(), R.drawable.widget_preview_tile, options));
+                } catch (OutOfMemoryError ee) {
+                    return null;
+                }
+            }
+
             final int previewDrawableWidth = previewDrawable
                     .getIntrinsicWidth();
             final int previewDrawableHeight = previewDrawable
