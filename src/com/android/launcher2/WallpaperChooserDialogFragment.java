@@ -104,6 +104,9 @@ public class WallpaperChooserDialogFragment extends DialogFragment implements
             mLoader.cancel(true);
             mLoader = null;
         }
+        if (mWallpaperDrawable != null) {
+            mWallpaperDrawable.recycleBitmap(mBitmap);
+        }
     }
 
     @Override
@@ -397,6 +400,13 @@ public class WallpaperChooserDialogFragment extends DialogFragment implements
                 return;
             mIntrinsicWidth = mBitmap.getWidth();
             mIntrinsicHeight = mBitmap.getHeight();
+        }
+
+        void recycleBitmap(Bitmap bitmap) {
+            if (bitmap != null) {
+                bitmap.recycle();
+                bitmap = null;
+            }
         }
 
         @Override
