@@ -695,7 +695,18 @@ public final class Launcher extends Activity
                         "widget configuration activity.");
                 completeTwoStageWidgetDrop(RESULT_CANCELED, appWidgetId);
             } else {
-                completeTwoStageWidgetDrop(resultCode, appWidgetId);
+                if (isWorkspaceLocked()) {
+                    final PendingAddArguments args = new PendingAddArguments();
+                    args.requestCode = requestCode;
+                    args.intent = data;
+                    args.container = mPendingAddInfo.container;
+                    args.screen = mPendingAddInfo.screen;
+                    args.cellX = mPendingAddInfo.cellX;
+                    args.cellY = mPendingAddInfo.cellY;
+                    sPendingAddList.add(args);
+                } else {
+                    completeTwoStageWidgetDrop(resultCode, appWidgetId);
+                }
             }
             return;
         }
