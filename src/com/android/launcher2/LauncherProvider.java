@@ -83,6 +83,7 @@ public class LauncherProvider extends ContentProvider {
     static final String LAUNCHERINFO = "launcher_info";
 
     private static boolean LAUNCHER_SHORTCUT_ENABLED;
+    private static boolean LAUNCHER_BACKUP_SHORTCUT_ENABLED;
 
     /**
      * {@link Uri} triggered at any registered {@link android.database.ContentObserver} when
@@ -221,7 +222,10 @@ public class LauncherProvider extends ContentProvider {
 
             // Use default workspace resource if none provided
             if (workspaceResId == 0) {
-                if(!LAUNCHER_SHORTCUT_ENABLED)
+                if (LAUNCHER_BACKUP_SHORTCUT_ENABLED)
+                    workspaceResId = sp.getInt(DEFAULT_WORKSPACE_RESOURCE_ID,
+                        R.xml.cm_with_backup_default_workspace);
+                else if (!LAUNCHER_SHORTCUT_ENABLED)
                     workspaceResId = sp.getInt(DEFAULT_WORKSPACE_RESOURCE_ID,
                         R.xml.default_workspace);
                 else
@@ -276,6 +280,8 @@ public class LauncherProvider extends ContentProvider {
 
             LAUNCHER_SHORTCUT_ENABLED =
                 context.getResources().getBoolean(R.bool.config_launcher_shortcut);
+            LAUNCHER_BACKUP_SHORTCUT_ENABLED = context.getResources().getBoolean(
+                    R.bool.config_launcher_show_backup_shortcut);
 
             mAppWidgetHost = new AppWidgetHost(context, Launcher.APPWIDGET_HOST_ID);
 
