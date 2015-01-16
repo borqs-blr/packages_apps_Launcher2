@@ -10,6 +10,7 @@ import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteDiskIOException;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
@@ -378,14 +379,20 @@ public class WidgetPreviewLoader {
         }
         new AsyncTask<Void, Void, Void>() {
             public Void doInBackground(Void ... args) {
-                SQLiteDatabase db = cacheDb.getWritableDatabase();
-                db.delete(CacheDb.TABLE_NAME,
-                        CacheDb.COLUMN_NAME + " LIKE ? OR " +
-                        CacheDb.COLUMN_NAME + " LIKE ?", // SELECT query
-                        new String[] {
-                            WIDGET_PREFIX + packageName + "/%",
-                            SHORTCUT_PREFIX + packageName + "/%"} // args to SELECT query
-                            );
+                try {
+                    SQLiteDatabase db = cacheDb.getWritableDatabase();
+                    db.delete(CacheDb.TABLE_NAME,
+                            CacheDb.COLUMN_NAME + " LIKE ? OR " +
+                            CacheDb.COLUMN_NAME + " LIKE ?", // SELECT query
+                            new String[] {
+                                WIDGET_PREFIX + packageName + "/%",
+                                SHORTCUT_PREFIX + packageName + "/%"} // args to SELECT query
+                                );
+                } catch (SQLiteDiskIOException ex) {
+                    // The dataabase file which location in cache may be deleted when
+                    // memory low, it will throw the SQLiteDiskIOException
+                    Log.e(TAG, "Error happened when remove from db: " + ex);
+                }
                 synchronized(sInvalidPackages) {
                     sInvalidPackages.remove(packageName);
                 }
