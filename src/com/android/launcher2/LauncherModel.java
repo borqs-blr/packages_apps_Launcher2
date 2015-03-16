@@ -2142,7 +2142,6 @@ public class LauncherModel extends BroadcastReceiver {
                     }
                     break;
                 case OP_REMOVE:
-                case OP_UNAVAILABLE:
                     for (int i=0; i<N; i++) {
                         if (DEBUG_LOADERS) Log.d(TAG, "mAllAppsList.removePackage " + packages[i]);
                         mBgAllAppsList.removePackage(packages[i], mOp == OP_REMOVE);
@@ -2151,6 +2150,9 @@ public class LauncherModel extends BroadcastReceiver {
                         WidgetPreviewLoader.removeFromDb(
                                 app.getWidgetPreviewCacheDb(), packages[i]);
                     }
+                    break;
+                case OP_UNAVAILABLE:
+                    Log.d(TAG, "OP_UNAVAILABLE don't deleting external package list");
                     break;
             }
 
